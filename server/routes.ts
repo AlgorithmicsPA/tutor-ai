@@ -235,6 +235,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to map image descriptions to generated images
+  const getEducationalImage = (description: string): string => {
+    const lowerDesc = description.toLowerCase();
+    
+    // Map keywords to appropriate generated images
+    if (lowerDesc.includes('robot') || lowerDesc.includes('profesor') || lowerDesc.includes('teacher') || lowerDesc.includes('clase')) {
+      return '/attached_assets/generated_images/Robot_teacher_with_diverse_children_bc4de1b4.png';
+    } else if (lowerDesc.includes('cómo funciona') || lowerDesc.includes('how ai works') || lowerDesc.includes('diagrama') || lowerDesc.includes('explicación')) {
+      return '/attached_assets/generated_images/How_AI_works_simple_diagram_62b5bad7.png';
+    } else if (lowerDesc.includes('chatgpt') && !lowerDesc.includes('gemini') && !lowerDesc.includes('vs')) {
+      return '/attached_assets/generated_images/ChatGPT_friendly_character_illustration_431b9259.png';
+    } else if (lowerDesc.includes('gemini') && !lowerDesc.includes('chatgpt') && !lowerDesc.includes('vs')) {
+      return '/attached_assets/generated_images/Gemini_friendly_star_character_8a90e0c2.png';
+    } else if ((lowerDesc.includes('chatgpt') && lowerDesc.includes('gemini')) || lowerDesc.includes('comparación') || lowerDesc.includes('vs') || lowerDesc.includes('diferencia')) {
+      return '/attached_assets/generated_images/ChatGPT_vs_Gemini_comparison_illustration_b8018ed9.png';
+    }
+    
+    // Default to the AI explanation diagram
+    return '/attached_assets/generated_images/How_AI_works_simple_diagram_62b5bad7.png';
+  };
+
   // Generate lesson content automatically using AI
   app.post("/api/lessons/generate", async (req, res) => {
     try {
@@ -303,7 +324,21 @@ Responde SOLO con el JSON, sin texto adicional.`;
 
       const parsedContent: GenerateLessonResponse = JSON.parse(generatedContent);
       
-      res.json(parsedContent);
+      // Process timeline to replace GENERATE_IMAGE markers with actual image paths
+      const processedTimeline = parsedContent.timeline.map((item: any) => {
+        if (item.type === "show_image" && item.src?.startsWith("GENERATE_IMAGE:")) {
+          const description = item.src.replace("GENERATE_IMAGE:", "").trim();
+          const imagePath = getEducationalImage(description);
+          
+          return {
+            ...item,
+            src: imagePath,
+          };
+        }
+        return item;
+      });
+      
+      res.json({ timeline: processedTimeline });
     } catch (error: any) {
       console.error("Failed to generate lesson:", error);
       res.status(500).json({ 

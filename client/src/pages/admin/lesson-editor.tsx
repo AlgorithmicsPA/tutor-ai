@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Lesson } from "@shared/schema";
-import { useState } from "react";
+import type { Lesson, TimelineItem } from "@shared/schema";
+import { useState, useEffect } from "react";
+import { TimelineBuilder } from "@/components/TimelineBuilder";
 
 export default function LessonEditorPage() {
   const [, params] = useRoute("/admin/lessons/:lessonId");
@@ -19,10 +20,22 @@ export default function LessonEditorPage() {
     enabled: !!lessonId && lessonId !== "new",
   });
 
-  const [title, setTitle] = useState(lesson?.title || "");
-  const [age, setAge] = useState(lesson?.age || "");
-  const [lang, setLang] = useState(lesson?.lang || "es");
-  const [objectives, setObjectives] = useState(lesson?.objectives.join("\n") || "");
+  const [title, setTitle] = useState("");
+  const [age, setAge] = useState("");
+  const [lang, setLang] = useState("es");
+  const [objectives, setObjectives] = useState("");
+  const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+
+  // Update form when lesson data loads
+  useEffect(() => {
+    if (lesson) {
+      setTitle(lesson.title);
+      setAge(lesson.age);
+      setLang(lesson.lang);
+      setObjectives(lesson.objectives.join("\n"));
+      setTimeline(lesson.timeline);
+    }
+  }, [lesson]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -153,12 +166,10 @@ export default function LessonEditorPage() {
                     <CardTitle>Editor de Contenido</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-center py-12 text-muted-foreground">
-                      <p>Editor de timeline próximamente...</p>
-                      <p className="text-sm mt-2">
-                        Por ahora, usa la pestaña de Metadatos para editar la información básica
-                      </p>
-                    </div>
+                    <TimelineBuilder
+                      items={timeline}
+                      onChange={setTimeline}
+                    />
                   </CardContent>
                 </Card>
               </TabsContent>

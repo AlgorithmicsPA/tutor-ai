@@ -1,14 +1,50 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Plus, Edit, Trash2, BookOpen, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { Lesson } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useState } from "react";
 
 export default function AdminLessonsPage() {
   const { data: lessons, isLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/admin/lessons"],
+  });
+  const { toast } = useToast();
+  const [lessonToDelete, setLessonToDelete] = useState<Lesson | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/lessons/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lessons"] });
+      toast({
+        title: "Lección eliminada",
+        description: "La lección se ha eliminado correctamente",
+      });
+      setLessonToDelete(null);
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar la lección",
+        variant: "destructive",
+      });
+    },
   });
 
   return (
@@ -105,6 +141,7 @@ export default function AdminLessonsPage() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={() => setLessonToDelete(lesson)}
                       data-testid={`button-delete-${lesson.id}`}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -132,6 +169,32 @@ export default function AdminLessonsPage() {
           </Card>
         )}
       </main>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!lessonToDelete} onOpenChange={() => setLessonToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente la lección{" "}
+              <span className="font-semibold">"{lessonToDelete?.title}"</span> y toda su información.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => lessonToDelete && deleteMutation.mutate(lessonToDelete.id)}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,0 +1,447 @@
+You are Replit Ghostwriter. Create a monorepo called "tutor-ia-mvp" that runs locally in a single Replit project with Node 18+. Use npm workspaces.
+
+ROOT STRUCTURE
+- package.json (workspaces, scripts)
+- .gitignore
+- .env.example
+- README.md
+- apps/web (Vite + React + TS + Tailwind + Zustand + React Router + MathJax + Monaco)
+- apps/api (Node + Express + TypeScript + zod + CORS)
+- packages/providers (TypeScript; unified interface for OpenAI & Google Gemini)
+- packages/core (TypeScript; types, DSL schema, rubrics, utils)
+- supabase/ (migrations placeholder)
+
+ENV KEYS (place in .env.example)
+OPENAI_API_KEY=
+GOOGLE_API_KEY=
+PROVIDER_DEFAULT=openai
+
+ROOT package.json
+{
+  "name": "tutor-ia-mvp",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "build": "npm -w apps/web run build && npm -w apps/api run build",
+    "dev": "concurrently -k \"npm -w apps/api run dev\" \"npm -w apps/web run dev\"",
+    "typecheck": "npm -w apps/web run typecheck && npm -w apps/api run typecheck",
+    "lint": "echo \"(add eslint later)\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
+
+.gitignore
+node_modules
+dist
+.env
+.env.local
+
+README.md
+- Quick start:
+  1) Copy .env.example -> .env and fill OPENAI_API_KEY or GOOGLE_API_KEY
+  2) npm install
+  3) npm run dev
+- Web runs on 5173 (Vite), API on 3000 (Express)
+- Visit http://localhost:5173
+
+======================
+PACKAGES/CORE
+======================
+Create packages/core/src/types.ts with:
+export type LessonDSL = {
+  meta: { id: string; title: string; age: string; lang: string };
+  objectives: string[];
+  timeline: Array<
+    | { type: "tutor_say"; text: string; voice?: boolean; role?: "guide"|"coach" }
+    | { type: "show_image"; src: string; alt?: string }
+    | { type: "quiz"; question: string; choices: string[]; answer: number }
+    | { type: "interactive"; widget: "order-steps"|"drag-drop"; data: any }
+    | { type: "reflection"; prompt: string }
+  >;
+  adaptation?: { if_score_below: number; goto: string };
+};
+
+Create packages/core/src/rubrics.ts with minimal scoring helper:
+export function scoreQuiz(answerIdx: number, userIdx: number){ return answerIdx === userIdx ? 1 : 0; }
+
+Create packages/core/package.json:
+{
+  "name": "@tutor/core",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "devDependencies": { "typescript": "^5.6.2" }
+}
+Create packages/core/tsconfig.json targeting ES2020, module ESNext, outDir dist, rootDir src.
+
+======================
+PACKAGES/PROVIDERS
+======================
+Interface + factory for providers.
+
+packages/providers/src/index.ts
+export interface ChatMessage { role: "system"|"user"|"assistant"; content: string; }
+export interface LLMProvider {
+  chat(opts:{system?:string; messages:ChatMessage[]}): Promise<string>;
+  image?(prompt: string): Promise<{url:string}>;
+  moderate?(text: string): Promise<{allowed:boolean; categories:string[]}>;
+}
+export function assertEnv(key:string){ const v = process.env[key]; if(!v) throw new Error(`Missing ${key}`); return v; }
+
+packages/providers/src/openai.ts
+import OpenAI from "openai";
+import { LLMProvider, ChatMessage, assertEnv } from "./index.js";
+export function openaiProvider(): LLMProvider {
+  const client = new OpenAI({ apiKey: assertEnv("OPENAI_API_KEY") });
+  return {
+    async chat({system, messages}:{system?:string; messages:ChatMessage[]}) {
+      const msgs = [
+        system ? { role:"system", content: system } : null,
+        ...messages
+      ].filter(Boolean) as any[];
+      const r = await client.chat.completions.create({
+        model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+        messages: msgs
+      });
+      return r.choices[0]?.message?.content ?? "";
+    }
+  };
+}
+
+packages/providers/src/gemini.ts
+import { LLMProvider, ChatMessage, assertEnv } from "./index.js";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+export function geminiProvider(): LLMProvider {
+  const genAI = new GoogleGenerativeAI(assertEnv("GOOGLE_API_KEY"));
+  const model = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || "gemini-1.5-pro" });
+  return {
+    async chat({system, messages}:{system?:string; messages:ChatMessage[]}) {
+      const content = (system?`[SYSTEM]\n${system}\n\n`:"") + messages.map(m=>`[${m.role.toUpperCase()}] ${m.content}`).join("\n");
+      const r = await model.generateContent(content);
+      return r.response.text();
+    }
+  };
+}
+
+packages/providers/src/factory.ts
+import { openaiProvider } from "./openai.js";
+import { geminiProvider } from "./gemini.js";
+import type { LLMProvider } from "./index.js";
+export function providerFor(name?:string): LLMProvider {
+  const key = (name || process.env.PROVIDER_DEFAULT || "openai").toLowerCase();
+  if (key.startsWith("gemini")) return geminiProvider();
+  return openaiProvider();
+}
+
+packages/providers/package.json with build script and deps:
+{
+  "name": "@tutor/providers",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "openai": "^4.57.0",
+    "@google/generative-ai": "^0.21.0"
+  },
+  "devDependencies": { "typescript": "^5.6.2" }
+}
+Add tsconfig.json similar to core.
+
+======================
+APPS/API
+======================
+TypeScript Express server exposing /api/tutor, /api/grade, /healthz.
+
+apps/api/package.json
+{
+  "name": "api",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "zod": "^3.23.8",
+    "@tutor/providers": "0.1.0",
+    "@tutor/core": "0.1.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  }
+}
+
+apps/api/tsconfig.json: ES2020, module ESNext, outDir dist, rootDir src.
+
+apps/api/src/index.ts
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import { providerFor } from "@tutor/providers/src/factory.js";
+import { z } from "zod";
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+app.get("/healthz", (_req,res)=>res.json({ok:true, provider: process.env.PROVIDER_DEFAULT || "openai"}));
+
+const ChatSchema = z.object({
+  messages: z.array(z.object({ role: z.enum(["system","user","assistant"]), content: z.string() })),
+  provider: z.string().optional(),
+  system: z.string().optional()
+});
+
+app.post("/api/tutor", async (req,res)=>{
+  const parsed = ChatSchema.safeParse(req.body);
+  if(!parsed.success) return res.status(400).json({error: parsed.error.format()});
+  const { messages, provider, system } = parsed.data;
+  try{
+    const llm = providerFor(provider);
+    const reply = await llm.chat({ system, messages });
+    res.json({ reply });
+  }catch(e:any){
+    res.status(500).json({ error: e.message || "LLM error" });
+  }
+});
+
+const GradeSchema = z.object({
+  lessonId: z.string(),
+  itemType: z.enum(["quiz"]),
+  answerIndex: z.number(),
+  userIndex: z.number()
+});
+
+import { scoreQuiz } from "@tutor/core/src/rubrics.js";
+app.post("/api/grade", (req,res)=>{
+  const p = GradeSchema.safeParse(req.body);
+  if(!p.success) return res.status(400).json({error:p.error.format()});
+  const { itemType, answerIndex, userIndex } = p.data;
+  let score = 0;
+  if(itemType==="quiz") score = scoreQuiz(answerIndex, userIndex);
+  res.json({ score });
+});
+
+app.listen(3000, ()=>console.log("API listening on :3000"));
+
+======================
+APPS/WEB
+======================
+Vite + React + TS with Tailwind. Add a minimal Tutor UI, DSL renderer, Quiz & OrderSteps widgets, and a toggle to call OpenAI or Gemini via /api/tutor.
+
+apps/web/package.json
+{
+  "name": "web",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview --port 5173"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.1",
+    "zustand": "^4.5.4",
+    "framer-motion": "^11.2.10",
+    "mathjax": "^3.2.2",
+    "monaco-editor": "^0.52.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "tailwindcss": "^3.4.14",
+    "postcss": "^8.4.47",
+    "autoprefixer": "^10.4.20"
+  }
+}
+
+apps/web/tailwind.config.js
+export default { content: ["./index.html","./src/**/*.{ts,tsx}"], theme: { extend: {} }, plugins: [] }
+
+apps/web/postcss.config.js
+export default { plugins: { tailwindcss: {}, autoprefixer: {} } }
+
+apps/web/tsconfig.json: TS config for vite/react.
+
+apps/web/index.html
+<!doctype html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Tutor IA</title></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+
+apps/web/src/main.tsx
+import React from "react";
+import { createRoot } from "react-dom/client";
+import { App } from "./pages/App";
+import "./index.css";
+createRoot(document.getElementById("root")!).render(<App/>);
+
+apps/web/src/index.css
+@tailwind base; @tailwind components; @tailwind utilities;
+body { @apply bg-gray-50 text-gray-900; }
+
+apps/web/src/pages/App.tsx
+import React, { useState } from "react";
+import { Renderer } from "../widgets/Renderer";
+import demo from "../samples/lesson_demo.json";
+
+export function App(){
+  const [provider,setProvider] = useState<"openai"|"gemini">("openai");
+  const [history,setHistory] = useState<{role:"user"|"assistant";content:string}[]>([]);
+  async function ask(text:string){
+    const res = await fetch("/api/tutor",{ method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ provider, system: SYSTEM_PROMPT, messages:[...history,{role:"user",content:text}] }) });
+    const data = await res.json();
+    setHistory(h=>[...h,{role:"assistant",content:data.reply}]);
+  }
+  return (
+    <div className="max-w-3xl mx-auto p-6 space-y-4">
+      <h1 className="text-2xl font-bold">Tutor IA MVP</h1>
+      <div className="flex gap-2">
+        <label className="text-sm">Proveedor:</label>
+        <select className="border rounded px-2 py-1" value={provider} onChange={e=>setProvider(e.target.value as any)}>
+          <option value="openai">OpenAI</option>
+          <option value="gemini">Gemini</option>
+        </select>
+      </div>
+      <Renderer dsl={demo}/>
+      <div className="border rounded-xl p-3 space-y-2">
+        <div className="font-semibold">Chat con Profe DANA</div>
+        <input className="w-full border rounded px-3 py-2" placeholder="Escribe aquí…" onKeyDown={(e)=>{ if(e.key==="Enter"){ ask((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value=""; }}}/>
+        <ul className="text-sm space-y-1">{history.map((m,i)=> <li key={i}><b>{m.role}:</b> {m.content}</li>)}</ul>
+      </div>
+    </div>
+  );
+}
+const SYSTEM_PROMPT = `Eres “Profe DANA”, un tutor infantil. Explica breve y pregunta: «¿Quieres intentarlo conmigo?» Evita temas no aptos. No des respuestas de evaluaciones.`;
+
+apps/web/src/widgets/Renderer.tsx
+import React from "react";
+import type { LessonDSL } from "@tutor/core/src/types";
+import { Quiz } from "./quiz/Quiz";
+import { OrderSteps } from "./quiz/OrderSteps";
+
+export function Renderer({ dsl }: { dsl: LessonDSL }){
+  return (
+    <div className="space-y-4">
+      {dsl.timeline.map((step, i) => {
+        if (step.type === "tutor_say") return <div key={i} className="bg-white rounded-2xl p-4 shadow">🧑‍🏫 {step.text}</div>;
+        if (step.type === "show_image") return <img key={i} src={step.src} alt={step.alt||""} className="rounded-2xl shadow"/>;
+        if (step.type === "quiz") return <Quiz key={i} {...step} />;
+        if (step.type === "interactive" && step.widget==="order-steps") return <OrderSteps key={i} {...step} />;
+        if (step.type === "reflection") return <div key={i} className="italic">💭 {step.prompt}</div>;
+        return null;
+      })}
+    </div>
+  );
+}
+
+apps/web/src/widgets/quiz/Quiz.tsx
+import React, { useState } from "react";
+export function Quiz({ question, choices, answer }:{question:string; choices:string[]; answer:number}){
+  const [picked,setPicked] = useState<number|null>(null);
+  const [result,setResult] = useState<null|boolean>(null);
+  async function submit(){
+    const res = await fetch("/api/grade",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({itemType:"quiz", lessonId:"demo-01", answerIndex:answer, userIndex:picked})});
+    const data = await res.json();
+    setResult(data.score===1);
+  }
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow">
+      <div className="font-semibold mb-2">❓ {question}</div>
+      <div className="space-y-2">
+        {choices.map((c,i)=>
+          <label key={i} className={`block p-2 border rounded ${picked===i?"bg-gray-100":""}`}>
+            <input type="radio" name="q" className="mr-2" onChange={()=>setPicked(i)} /> {c}
+          </label>)}
+      </div>
+      <button className="mt-3 px-3 py-2 rounded bg-black text-white disabled:opacity-50" disabled={picked===null} onClick={submit}>Comprobar</button>
+      {result!=null && <div className="mt-2">{result? "✅ ¡Muy bien!":"❌ Sigue intentando."}</div>}
+    </div>
+  );
+}
+
+apps/web/src/widgets/quiz/OrderSteps.tsx
+import React, { useState } from "react";
+export function OrderSteps({ data }:{ data:{steps:string[]; answer:number[]} }){
+  const [order,setOrder] = useState<number[]>(data.steps.map((_,i)=>i));
+  function move(i:number, dir:-1|1){
+    const j = i+dir; if(j<0||j>=order.length) return;
+    const next = [...order]; [next[i], next[j]] = [next[j], next[i]];
+    setOrder(next);
+  }
+  const correct = JSON.stringify(order)===JSON.stringify(data.answer);
+  return (
+    <div className="bg-white rounded-2xl p-4 shadow">
+      <div className="font-semibold mb-2">📐 Ordena los pasos</div>
+      <ul className="space-y-1">
+        {order.map((idx,i)=>(
+          <li key={i} className="flex items-center gap-2">
+            <span className="flex-1 border rounded px-2 py-1">{data.steps[idx]}</span>
+            <div className="flex gap-1">
+              <button className="px-2 py-1 border rounded" onClick={()=>move(i,-1)}>↑</button>
+              <button className="px-2 py-1 border rounded" onClick={()=>move(i,1)}>↓</button>
+            </div>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2">{correct? "✅ ¡Correcto!":"…"}</div>
+    </div>
+  );
+}
+
+apps/web/src/samples/lesson_demo.json
+{
+  "meta": { "id": "demo-01", "title": "Sumas divertidas", "age": "7-9", "lang": "es" },
+  "objectives": ["Sumar hasta 20", "Reconocer patrones"],
+  "timeline": [
+    { "type": "tutor_say", "text": "¡Hola! Hoy sumamos con frutas 🍎🍌", "voice": true },
+    { "type": "show_image", "src": "https://picsum.photos/seed/fruits/800/300", "alt": "Frutas" },
+    { "type": "quiz", "question": "¿Cuánto es 7 + 5?", "choices": ["10","11","12"], "answer": 2 },
+    { "type": "interactive", "widget": "order-steps", "data": { "steps": ["Juntar 5","Juntar 7","Contar todas"], "answer": [1,0,2] } },
+    { "type": "reflection", "prompt": "¿Qué objetos usarías para contar en casa?" }
+  ]
+}
+
+apps/web/vite.config.ts
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+export default defineConfig({
+  plugins: [react()],
+  server: { proxy: { "/api": "http://localhost:3000", "/healthz": "http://localhost:3000" } }
+});
+
+======================
+SUPABASE
+======================
+Create supabase/README.md with a short note: “Add migrations later for students, lessons, attempts, progress”. (Out of scope for initial MVP)
+
+======================
+SETUP STEPS (Replit)
+======================
+1) Generate the whole workspace with these files.
+2) Run: npm install
+3) Create .env from .env.example and set at least OPENAI_API_KEY (or GOOGLE_API_KEY) and PROVIDER_DEFAULT=openai
+4) npm run dev
+5) Open http://localhost:5173 and test:
+   - Try the quiz widget
+   - Use the chat input; switch provider between OpenAI and Gemini
+6) Health check at /healthz
+
+Quality bar:
+- TypeScript builds cleanly in all packages
+- Dev server runs both API and Web concurrently
+- Minimal, kid-friendly UI with big rounded cards
+- Keep bundle light; no heavy extras

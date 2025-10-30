@@ -1,13 +1,13 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
-import { ArrowLeft, Save, Eye } from "lucide-react";
+import { ArrowLeft, Save, Eye, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Lesson, TimelineItem, InsertLesson, LessonDSL } from "@shared/schema";
+import type { Lesson, TimelineItem, InsertLesson, LessonDSL, GenerateLessonResponse } from "@shared/schema";
 import { useState, useEffect, useMemo } from "react";
 import { TimelineBuilder } from "@/components/TimelineBuilder";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -94,6 +94,67 @@ export default function LessonEditorPage() {
       });
     },
   });
+
+  // Generate content mutation
+  const generateMutation = useMutation({
+    mutationFn: async () => {
+      const objectivesArray = objectives.split("\n").filter(line => line.trim().length > 0);
+      
+      return apiRequest<GenerateLessonResponse>("POST", "/api/lessons/generate", {
+        title,
+        age,
+        objectives: objectivesArray,
+        lang,
+      });
+    },
+    onSuccess: (data) => {
+      setTimeline(data.timeline as TimelineItem[]);
+      toast({
+        title: "¡Contenido generado!",
+        description: "La lección ha sido generada automáticamente. Revisa y ajusta según necesites.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al generar",
+        description: error.message || "No se pudo generar el contenido automáticamente",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerate = () => {
+    // Validation for generation
+    if (!title.trim()) {
+      toast({
+        title: "Error de validación",
+        description: "El título es obligatorio para generar contenido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!age.trim()) {
+      toast({
+        title: "Error de validación",
+        description: "La edad objetivo es obligatoria para generar contenido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const objectivesArray = objectives.split("\n").filter(line => line.trim().length > 0);
+    if (objectivesArray.length === 0) {
+      toast({
+        title: "Error de validación",
+        description: "Debes incluir al menos un objetivo de aprendizaje",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    generateMutation.mutate();
+  };
 
   const handleSave = () => {
     // Basic validation
@@ -219,6 +280,9 @@ export default function LessonEditorPage() {
                 <Card>
                   <CardHeader>
                     <CardTitle>Información de la Lección</CardTitle>
+                    <CardDescription>
+                      Completa los metadatos básicos y genera contenido automáticamente con IA
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="space-y-2">
@@ -268,6 +332,27 @@ export default function LessonEditorPage() {
                         value={objectives}
                         onChange={(e) => setObjectives(e.target.value)}
                       />
+                    </div>
+
+                    <div className="flex items-start gap-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-sm text-foreground mb-1 flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-primary" />
+                          Generación Automática con IA
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          Completa los campos anteriores y la IA creará automáticamente todo el contenido de la lección: mensajes del tutor, quizzes, reflexiones e imágenes educativas.
+                        </p>
+                      </div>
+                      <Button
+                        onClick={handleGenerate}
+                        disabled={generateMutation.isPending}
+                        data-testid="button-generate"
+                        className="flex-shrink-0"
+                      >
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        {generateMutation.isPending ? "Generando..." : "Generar Automáticamente"}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>

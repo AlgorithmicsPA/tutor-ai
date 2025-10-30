@@ -158,7 +158,11 @@ export default function Home() {
                     totalItems={lesson.timeline.length}
                     quizScores={quizScores}
                   />
-                  <LessonRenderer lesson={lesson} onQuizComplete={handleQuizComplete} />
+                  <LessonRenderer 
+                    lesson={lesson} 
+                    onQuizComplete={handleQuizComplete}
+                    userQuizScores={quizScores}
+                  />
                 </>
               ) : null}
             </motion.div>

@@ -18,26 +18,55 @@ export const lessonDSLSchema = z.object({
         text: z.string(),
         voice: z.boolean().optional(),
         role: z.enum(["guide", "coach"]).optional(),
+        condition: z.object({
+          requireMinScore: z.number().optional(),
+          requireMaxScore: z.number().optional(),
+        }).optional(),
       }),
       z.object({
         type: z.literal("show_image"),
         src: z.string(),
         alt: z.string().optional(),
+        condition: z.object({
+          requireMinScore: z.number().optional(),
+          requireMaxScore: z.number().optional(),
+        }).optional(),
       }),
       z.object({
         type: z.literal("quiz"),
         question: z.string(),
         choices: z.array(z.string()),
         answer: z.number(),
+        condition: z.object({
+          requireMinScore: z.number().optional(),
+          requireMaxScore: z.number().optional(),
+        }).optional(),
       }),
       z.object({
         type: z.literal("interactive"),
         widget: z.enum(["order-steps", "drag-drop"]),
         data: z.any(),
+        condition: z.object({
+          requireMinScore: z.number().optional(),
+          requireMaxScore: z.number().optional(),
+        }).optional(),
       }),
       z.object({
         type: z.literal("reflection"),
         prompt: z.string(),
+        condition: z.object({
+          requireMinScore: z.number().optional(),
+          requireMaxScore: z.number().optional(),
+        }).optional(),
+      }),
+      z.object({
+        type: z.literal("adaptive_path"),
+        message: z.string(),
+        icon: z.enum(["star", "lightbulb", "rocket"]).optional(),
+        condition: z.object({
+          requireMinScore: z.number().optional(),
+          requireMaxScore: z.number().optional(),
+        }).optional(),
       }),
     ])
   ),

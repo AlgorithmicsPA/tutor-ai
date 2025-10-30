@@ -4,13 +4,40 @@ import { LessonImage } from "./LessonImage";
 import { QuizWidget } from "./QuizWidget";
 import { OrderStepsWidget } from "./OrderStepsWidget";
 import { ReflectionPrompt } from "./ReflectionPrompt";
+import { AdaptivePathIndicator } from "./AdaptivePathIndicator";
 
 interface LessonRendererProps {
   lesson: LessonDSL;
   onQuizComplete?: (itemIndex: number, score: number) => void;
+  userQuizScores?: { index: number; score: number }[];
 }
 
-export function LessonRenderer({ lesson, onQuizComplete }: LessonRendererProps) {
+export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: LessonRendererProps) {
+  // Calculate average quiz score (0-1 scale)
+  const calculateAverageScore = (): number => {
+    if (userQuizScores.length === 0) return 0;
+    const totalScore = userQuizScores.reduce((sum, q) => sum + q.score, 0);
+    return totalScore / userQuizScores.length;
+  };
+
+  const averageScore = calculateAverageScore();
+
+  // Check if an item should be shown based on its condition
+  const shouldShowItem = (item: LessonDSL["timeline"][number]): boolean => {
+    if (!("condition" in item) || !item.condition) return true;
+    
+    const { requireMinScore, requireMaxScore } = item.condition;
+    
+    if (requireMinScore !== undefined && averageScore < requireMinScore) {
+      return false;
+    }
+    
+    if (requireMaxScore !== undefined && averageScore > requireMaxScore) {
+      return false;
+    }
+    
+    return true;
+  };
   return (
     <div className="space-y-6" data-testid="lesson-renderer">
       {/* Lesson Header */}
@@ -46,6 +73,11 @@ export function LessonRenderer({ lesson, onQuizComplete }: LessonRendererProps) 
       {/* Timeline Items */}
       <div className="space-y-6">
         {lesson.timeline.map((item, index) => {
+          // Check if item should be shown based on conditions
+          if (!shouldShowItem(item)) {
+            return null;
+          }
+
           switch (item.type) {
             case "tutor_say":
               return (
@@ -89,6 +121,14 @@ export function LessonRenderer({ lesson, onQuizComplete }: LessonRendererProps) 
                 <ReflectionPrompt
                   key={index}
                   prompt={item.prompt}
+                />
+              );
+            case "adaptive_path":
+              return (
+                <AdaptivePathIndicator
+                  key={index}
+                  message={item.message}
+                  icon={item.icon}
                 />
               );
             default:

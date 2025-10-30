@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Lesson, TimelineItem, InsertLesson } from "@shared/schema";
-import { useState, useEffect } from "react";
+import type { Lesson, TimelineItem, InsertLesson, LessonDSL } from "@shared/schema";
+import { useState, useEffect, useMemo } from "react";
 import { TimelineBuilder } from "@/components/TimelineBuilder";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { LessonRenderer } from "@/components/LessonRenderer";
 
 export default function LessonEditorPage() {
   const [, params] = useRoute("/admin/lessons/:lessonId");
@@ -126,6 +127,22 @@ export default function LessonEditorPage() {
     saveMutation.mutate();
   };
 
+  // Build preview lesson object from current form state
+  const previewLesson = useMemo<LessonDSL>(() => {
+    const objectivesArray = objectives.split("\n").filter(line => line.trim().length > 0);
+    
+    return {
+      meta: {
+        id: lesson?.lessonId || "preview",
+        title: title || "Sin título",
+        age: age || "N/A",
+        lang: lang || "es",
+      },
+      objectives: objectivesArray,
+      timeline: timeline,
+    };
+  }, [title, age, lang, objectives, timeline, lesson?.lessonId]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -186,12 +203,15 @@ export default function LessonEditorPage() {
         ) : (
           <div className="max-w-6xl mx-auto">
             <Tabs defaultValue="metadata" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 max-w-md">
+              <TabsList className="grid w-full grid-cols-3 max-w-2xl">
                 <TabsTrigger value="metadata" data-testid="tab-metadata">
                   Metadatos
                 </TabsTrigger>
                 <TabsTrigger value="content" data-testid="tab-content">
                   Contenido
+                </TabsTrigger>
+                <TabsTrigger value="preview" data-testid="tab-preview">
+                  Vista Previa
                 </TabsTrigger>
               </TabsList>
 
@@ -263,6 +283,19 @@ export default function LessonEditorPage() {
                       items={timeline}
                       onChange={setTimeline}
                     />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="preview" className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Vista Previa de la Lección</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="bg-muted/30 rounded-lg p-6 border border-muted">
+                      <LessonRenderer lesson={previewLesson} />
+                    </div>
                   </CardContent>
                 </Card>
               </TabsContent>

@@ -161,3 +161,48 @@ export const insertUserProgressSchema = createInsertSchema(userProgress).omit({
 
 export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
 export type UserProgress = typeof userProgress.$inferSelect;
+
+// Lesson Generation Schema
+export const generateLessonRequestSchema = z.object({
+  title: z.string().min(1, "El título es obligatorio"),
+  age: z.string().min(1, "La edad es obligatoria"),
+  objectives: z.array(z.string()).min(1, "Al menos un objetivo es obligatorio"),
+  lang: z.string().default("es"),
+});
+
+export type GenerateLessonRequest = z.infer<typeof generateLessonRequestSchema>;
+
+export const generateLessonResponseSchema = z.object({
+  timeline: z.array(
+    z.discriminatedUnion("type", [
+      z.object({
+        type: z.literal("tutor_say"),
+        text: z.string(),
+        voice: z.boolean().optional(),
+        role: z.enum(["guide", "coach"]).optional(),
+      }),
+      z.object({
+        type: z.literal("show_image"),
+        src: z.string(),
+        alt: z.string().optional(),
+      }),
+      z.object({
+        type: z.literal("quiz"),
+        question: z.string(),
+        choices: z.array(z.string()),
+        answer: z.number(),
+      }),
+      z.object({
+        type: z.literal("interactive"),
+        widget: z.enum(["order-steps", "drag-drop"]),
+        data: z.any(),
+      }),
+      z.object({
+        type: z.literal("reflection"),
+        prompt: z.string(),
+      }),
+    ])
+  ),
+});
+
+export type GenerateLessonResponse = z.infer<typeof generateLessonResponseSchema>;

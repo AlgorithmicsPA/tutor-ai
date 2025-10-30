@@ -7,9 +7,11 @@ import {
   gradeRequestSchema,
   insertLessonSchema,
   insertUserProgressSchema,
+  generateLessonRequestSchema,
   type TutorResponse,
   type GradeResponse,
-  type Lesson 
+  type Lesson,
+  type GenerateLessonResponse
 } from "@shared/schema";
 import { storage } from "./storage";
 
@@ -230,6 +232,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Failed to delete lesson:", error);
       res.status(500).json({ error: "Failed to delete lesson" });
+    }
+  });
+
+  // Generate lesson content automatically using AI
+  app.post("/api/lessons/generate", async (req, res) => {
+    try {
+      const parsed = generateLessonRequestSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Invalid generation request", 
+          details: parsed.error.format() 
+        });
+      }
+
+      const { title, age, objectives, lang } = parsed.data;
+
+      // Create a detailed prompt for the AI to generate structured lesson content
+      const prompt = `Eres un experto en educación infantil creando lecciones sobre Inteligencia Artificial para niños de ${age} años.
+
+Título de la lección: "${title}"
+Objetivos de aprendizaje:
+${objectives.map((obj, i) => `${i + 1}. ${obj}`).join('\n')}
+
+Genera una lección interactiva y educativa con los siguientes elementos en JSON:
+
+1. Comienza con 2-3 mensajes del tutor (type: "tutor_say") explicando conceptos básicos de forma amigable y simple
+2. Incluye 2-3 quizzes (type: "quiz") con preguntas de opción múltiple relacionadas al tema (4 opciones cada una)
+3. Agrega 1-2 prompts de reflexión (type: "reflection") para que los niños piensen sobre lo aprendido
+4. Incluye marcadores de imágenes (type: "show_image") donde se necesiten ilustraciones (usa src: "GENERATE_IMAGE: <descripción detallada de la imagen>")
+
+Formato JSON esperado:
+{
+  "timeline": [
+    {"type": "tutor_say", "text": "...", "voice": true, "role": "guide"},
+    {"type": "quiz", "question": "...", "choices": ["opción 1", "opción 2", "opción 3", "opción 4"], "answer": 0},
+    {"type": "show_image", "src": "GENERATE_IMAGE: ilustración colorida de...", "alt": "..."},
+    {"type": "reflection", "prompt": "..."}
+  ]
+}
+
+IMPORTANTE:
+- Los mensajes del tutor deben ser cortos, claros y motivadores
+- Las preguntas de quiz deben estar adaptadas a la edad ${age}
+- Usa lenguaje simple y ejemplos concretos
+- Para cada imagen, describe detalladamente lo que debe mostrar (será generada automáticamente)
+- Incluye al menos 8-10 items en total en el timeline
+- Varía el tipo de items para mantener el interés
+
+Responde SOLO con el JSON, sin texto adicional.`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-5",
+        messages: [
+          { 
+            role: "system", 
+            content: "Eres un experto diseñador de contenido educativo para niños. Generas JSON estructurado válido siguiendo exactamente el formato solicitado." 
+          },
+          { role: "user", content: prompt }
+        ],
+        max_completion_tokens: 8192,
+        response_format: { type: "json_object" },
+      });
+
+      const generatedContent = response.choices[0]?.message?.content;
+      if (!generatedContent) {
+        throw new Error("No se pudo generar contenido");
+      }
+
+      const parsedContent: GenerateLessonResponse = JSON.parse(generatedContent);
+      
+      res.json(parsedContent);
+    } catch (error: any) {
+      console.error("Failed to generate lesson:", error);
+      res.status(500).json({ 
+        error: "Failed to generate lesson",
+        message: error.message 
+      });
     }
   });
 

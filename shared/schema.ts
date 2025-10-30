@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { pgTable, serial, varchar, text, json, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
 
 // Lesson DSL Types - Core data model for educational content
 export const lessonDSLSchema = z.object({
@@ -85,3 +87,48 @@ export const gradeResponseSchema = z.object({
 });
 
 export type GradeResponse = z.infer<typeof gradeResponseSchema>;
+
+// Database Tables
+export const lessons = pgTable("lessons", {
+  id: serial("id").primaryKey(),
+  lessonId: varchar("lesson_id", { length: 255 }).notNull().unique(),
+  title: varchar("title", { length: 255 }).notNull(),
+  age: varchar("age", { length: 50 }).notNull(),
+  lang: varchar("lang", { length: 10 }).notNull().default("es"),
+  objectives: text("objectives").array().notNull(),
+  timeline: json("timeline").notNull().$type<LessonDSL["timeline"]>(),
+  adaptation: json("adaptation").$type<LessonDSL["adaptation"]>(),
+  published: boolean("published").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertLessonSchema = createInsertSchema(lessons).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLesson = z.infer<typeof insertLessonSchema>;
+export type Lesson = typeof lessons.$inferSelect;
+
+export const userProgress = pgTable("user_progress", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 255 }).notNull(),
+  lessonId: varchar("lesson_id", { length: 255 }).notNull(),
+  quizScores: json("quiz_scores").notNull().$type<{ index: number; score: number }[]>().default([]),
+  completedItems: json("completed_items").notNull().$type<number[]>().default([]),
+  lastPosition: integer("last_position").notNull().default(0),
+  completed: boolean("completed").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertUserProgressSchema = createInsertSchema(userProgress).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertUserProgress = z.infer<typeof insertUserProgressSchema>;
+export type UserProgress = typeof userProgress.$inferSelect;

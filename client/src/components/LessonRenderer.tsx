@@ -7,9 +7,10 @@ import { ReflectionPrompt } from "./ReflectionPrompt";
 
 interface LessonRendererProps {
   lesson: LessonDSL;
+  onQuizComplete?: (itemIndex: number, score: number) => void;
 }
 
-export function LessonRenderer({ lesson }: LessonRendererProps) {
+export function LessonRenderer({ lesson, onQuizComplete }: LessonRendererProps) {
   return (
     <div className="space-y-6" data-testid="lesson-renderer">
       {/* Lesson Header */}
@@ -70,6 +71,7 @@ export function LessonRenderer({ lesson }: LessonRendererProps) {
                   choices={item.choices}
                   answer={item.answer}
                   lessonId={lesson.meta.id}
+                  onComplete={(score) => onQuizComplete?.(index, score)}
                 />
               );
             case "interactive":

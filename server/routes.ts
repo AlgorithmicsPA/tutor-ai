@@ -5,9 +5,13 @@ import { GoogleGenAI } from "@google/genai";
 import { 
   tutorRequestSchema, 
   gradeRequestSchema,
+  insertLessonSchema,
+  insertUserProgressSchema,
   type TutorResponse,
-  type GradeResponse 
+  type GradeResponse,
+  type Lesson 
 } from "@shared/schema";
+import { storage } from "./storage";
 
 // This is using Replit's AI Integrations service, which provides OpenAI-compatible API access
 // without requiring your own OpenAI API key. Charges are billed to your Replit credits.
@@ -130,6 +134,165 @@ export async function registerRoutes(app: Express): Promise<Server> {
         error: "Failed to grade response",
         message: error.message 
       });
+    }
+  });
+
+  // Lesson CRUD endpoints
+  
+  // Get all published lessons
+  app.get("/api/lessons", async (_req, res) => {
+    try {
+      const lessons = await storage.getPublishedLessons();
+      res.json(lessons);
+    } catch (error: any) {
+      console.error("Failed to fetch lessons:", error);
+      res.status(500).json({ error: "Failed to fetch lessons" });
+    }
+  });
+
+  // Get single lesson by lessonId
+  app.get("/api/lessons/:lessonId", async (req, res) => {
+    try {
+      const lesson = await storage.getLessonByLessonId(req.params.lessonId);
+      if (!lesson) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+      res.json(lesson);
+    } catch (error: any) {
+      console.error("Failed to fetch lesson:", error);
+      res.status(500).json({ error: "Failed to fetch lesson" });
+    }
+  });
+
+  // Create new lesson
+  app.post("/api/lessons", async (req, res) => {
+    try {
+      const parsed = insertLessonSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Invalid lesson data", 
+          details: parsed.error.format() 
+        });
+      }
+
+      const lesson = await storage.createLesson(parsed.data);
+      res.status(201).json(lesson);
+    } catch (error: any) {
+      console.error("Failed to create lesson:", error);
+      res.status(500).json({ error: "Failed to create lesson" });
+    }
+  });
+
+  // Update lesson
+  app.put("/api/lessons/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid lesson ID" });
+      }
+
+      const parsed = insertLessonSchema.partial().safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Invalid lesson data", 
+          details: parsed.error.format() 
+        });
+      }
+
+      const lesson = await storage.updateLesson(id, parsed.data);
+      if (!lesson) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+
+      res.json(lesson);
+    } catch (error: any) {
+      console.error("Failed to update lesson:", error);
+      res.status(500).json({ error: "Failed to update lesson" });
+    }
+  });
+
+  // Delete lesson
+  app.delete("/api/lessons/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid lesson ID" });
+      }
+
+      const success = await storage.deleteLesson(id);
+      if (!success) {
+        return res.status(404).json({ error: "Lesson not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Failed to delete lesson:", error);
+      res.status(500).json({ error: "Failed to delete lesson" });
+    }
+  });
+
+  // User Progress endpoints
+  
+  // Get user progress for a specific lesson
+  app.get("/api/progress/:userId/:lessonId", async (req, res) => {
+    try {
+      const { userId, lessonId } = req.params;
+      const progress = await storage.getUserProgress(userId, lessonId);
+      
+      if (!progress) {
+        // Return empty progress if not found
+        return res.json({
+          userId,
+          lessonId,
+          quizScores: [],
+          completedItems: [],
+          lastPosition: 0,
+          completed: false,
+        });
+      }
+      
+      res.json(progress);
+    } catch (error: any) {
+      console.error("Failed to fetch progress:", error);
+      res.status(500).json({ error: "Failed to fetch progress" });
+    }
+  });
+
+  // Create or update user progress (upsert)
+  app.post("/api/progress", async (req, res) => {
+    try {
+      const parsed = insertUserProgressSchema.safeParse(req.body);
+      
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Invalid progress data", 
+          details: parsed.error.format() 
+        });
+      }
+
+      const { userId, lessonId, ...progressData } = parsed.data;
+      
+      // Check if progress already exists
+      const existing = await storage.getUserProgress(userId, lessonId);
+      
+      if (existing) {
+        // Update existing progress with full data
+        const updated = await storage.updateUserProgress(existing.id, {
+          userId,
+          lessonId,
+          ...progressData,
+        });
+        return res.json(updated);
+      } else {
+        // Create new progress
+        const created = await storage.createUserProgress(parsed.data);
+        return res.status(201).json(created);
+      }
+    } catch (error: any) {
+      console.error("Failed to save progress:", error);
+      res.status(500).json({ error: "Failed to save progress" });
     }
   });
 

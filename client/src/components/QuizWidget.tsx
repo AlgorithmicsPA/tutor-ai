@@ -10,9 +10,10 @@ interface QuizWidgetProps {
   choices: string[];
   answer: number;
   lessonId?: string;
+  onComplete?: (score: number) => void;
 }
 
-export function QuizWidget({ question, choices, answer, lessonId = "demo-01" }: QuizWidgetProps) {
+export function QuizWidget({ question, choices, answer, lessonId = "demo-01", onComplete }: QuizWidgetProps) {
   const [picked, setPicked] = useState<number | null>(null);
   const [result, setResult] = useState<boolean | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -32,10 +33,15 @@ export function QuizWidget({ question, choices, answer, lessonId = "demo-01" }: 
           userIndex: picked,
         }
       );
-      setResult(data.score === 1);
+      const isCorrect = data.score === 1;
+      setResult(isCorrect);
+      
+      // Notify parent component of completion
+      onComplete?.(data.score);
     } catch (error) {
       console.error("Failed to grade quiz:", error);
       setResult(false);
+      onComplete?.(0);
     } finally {
       setIsSubmitting(false);
     }

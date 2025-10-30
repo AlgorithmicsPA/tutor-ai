@@ -35,7 +35,9 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - `ChatInterface`: Real-time AI tutor chat with message history
 - `QuizWidget`: Interactive multiple-choice assessments with server-side grading
 - `OrderStepsWidget`: Drag-and-drop sequencing exercises
-- `TutorMessage`: Friendly AI tutor message displays with role-based icons
+- `TutorMessage`: Friendly AI tutor message displays with role-based icons and Text-to-Speech
+- `TimelineBuilder`: Visual drag-and-drop editor for lesson content creation
+- `LessonEditorPage`: Complete authoring interface with metadata, content, and live preview tabs
 
 ### Backend Architecture
 
@@ -51,6 +53,8 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - RESTful endpoints with Zod schema validation
 - `/api/tutor`: AI chat completions with conversation history
 - `/api/grade`: Server-side answer validation and scoring
+- `/api/lessons`: Full CRUD for lesson management (GET/POST/PUT/DELETE)
+- `/api/progress`: User progress tracking and quiz score persistence
 - `/healthz`: Health check with provider availability status
 
 **AI Provider Strategy:**
@@ -93,8 +97,10 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - Metadata includes target age range, language, and learning objectives
 
 **Content Storage:**
-- Currently: Static demo lesson in client code
-- Designed for: Database-backed lesson library with versioning
+- PostgreSQL database-backed lesson library
+- Full CRUD API endpoints for lesson management
+- Lesson authoring interface at `/admin/lessons`
+- Real-time preview and validation system
 
 ## External Dependencies
 

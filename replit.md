@@ -2,11 +2,13 @@
 
 ## Overview
 
-Tutor IA is an educational platform designed for children aged 7-9, providing interactive AI-powered tutoring experiences. The application delivers structured lessons with quizzes, interactive widgets, and chat-based tutoring using multiple AI providers (OpenAI GPT and Google Gemini). The platform focuses on making learning engaging through a child-friendly Material Design interface with custom adaptations for educational contexts.
+Tutor IA is an educational platform designed for children aged 7-9, teaching them about **Artificial Intelligence** and how to use AI assistants like OpenAI and Gemini. The application delivers structured lessons with quizzes, interactive widgets, and chat-based tutoring using multiple AI providers (OpenAI GPT and Google Gemini). The platform focuses on making learning engaging through a child-friendly Material Design interface with custom adaptations for educational contexts.
 
 ## User Preferences
 
-Preferred communication style: Simple, everyday language.
+- Preferred communication language: **Spanish**
+- Preferred communication style: Simple, everyday language
+- Content focus: Teaching about **Artificial Intelligence** (how to use OpenAI and Gemini), not mathematics
 
 ## System Architecture
 

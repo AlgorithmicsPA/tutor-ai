@@ -10,6 +10,14 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - Preferred communication style: Simple, everyday language
 - Content focus: Teaching about **Artificial Intelligence** (how to use OpenAI and Gemini), not mathematics
 
+## Recent Changes (October 30, 2025)
+
+### Student/Admin Separation Architecture
+- **Student Area (/)**: Home page displays only published lessons with double filtering (backend + frontend) for security
+- **Admin Area (/admin)**: Dashboard with statistics, quick actions, and lesson management
+- **Navigation**: Clear separation maintained - admin buttons always return to /admin context
+- **Security**: Separate endpoints ensure students never see draft content
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -38,6 +46,9 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - `TutorMessage`: Friendly AI tutor message displays with role-based icons and Text-to-Speech
 - `TimelineBuilder`: Visual drag-and-drop editor for lesson content creation
 - `LessonEditorPage`: Complete authoring interface with metadata, content, and live preview tabs
+- `HomePage`: Student-facing lesson browser showing only published lessons
+- `LessonViewPage`: Student-facing lesson player with full interactive experience
+- `AdminDashboard`: Admin panel with statistics and quick actions
 
 ### Backend Architecture
 
@@ -53,7 +64,9 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - RESTful endpoints with Zod schema validation
 - `/api/tutor`: AI chat completions with conversation history
 - `/api/grade`: Server-side answer validation and scoring
-- `/api/lessons`: Full CRUD for lesson management (GET/POST/PUT/DELETE)
+- `/api/lessons`: Public endpoint returning ONLY published lessons (for students)
+- `/api/admin/lessons`: Admin endpoint returning ALL lessons (published and drafts)
+- `/api/lessons/:id`: Full CRUD for individual lessons (GET/POST/PUT/DELETE)
 - `/api/progress`: User progress tracking and quiz score persistence
 - `/healthz`: Health check with provider availability status
 

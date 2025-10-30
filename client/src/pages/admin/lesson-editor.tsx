@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { useRoute, Link } from "wouter";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useRoute, Link, useLocation } from "wouter";
 import { ArrowLeft, Save, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,13 +7,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { Lesson, TimelineItem } from "@shared/schema";
+import type { Lesson, TimelineItem, InsertLesson } from "@shared/schema";
 import { useState, useEffect } from "react";
 import { TimelineBuilder } from "@/components/TimelineBuilder";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 export default function LessonEditorPage() {
   const [, params] = useRoute("/admin/lessons/:lessonId");
+  const [, setLocation] = useLocation();
   const lessonId = params?.lessonId;
+  const { toast } = useToast();
 
   const { data: lesson, isLoading } = useQuery<Lesson>({
     queryKey: ["/api/lessons", lessonId],
@@ -36,6 +40,91 @@ export default function LessonEditorPage() {
       setTimeline(lesson.timeline);
     }
   }, [lesson]);
+
+  // Save mutation
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const objectivesArray = objectives.split("\n").filter(line => line.trim().length > 0);
+      
+      const lessonData: InsertLesson = {
+        lessonId: lesson?.lessonId || `lesson-${Date.now()}`,
+        title,
+        age,
+        lang,
+        objectives: objectivesArray,
+        timeline,
+        published: lesson?.published ?? false, // Preserve existing published state
+      };
+
+      if (lessonId === "new" || !lesson) {
+        // Create new lesson
+        return apiRequest<Lesson>("POST", "/api/lessons", lessonData);
+      } else {
+        // Update existing lesson
+        return apiRequest<Lesson>("PUT", `/api/lessons/${lesson.id}`, lessonData);
+      }
+    },
+    onSuccess: (data) => {
+      // Invalidate lessons list
+      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      
+      // Invalidate the specific lesson - use the returned lessonId for new lessons
+      if (lessonId === "new") {
+        queryClient.invalidateQueries({ queryKey: ["/api/lessons", data.lessonId] });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ["/api/lessons", lessonId] });
+      }
+      
+      toast({
+        title: "Lección guardada",
+        description: "Los cambios se han guardado correctamente",
+      });
+
+      // Navigate to edit page if creating new lesson
+      if (lessonId === "new") {
+        setLocation(`/admin/lessons/${data.lessonId}`);
+      }
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error al guardar",
+        description: error.message || "No se pudo guardar la lección",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSave = () => {
+    // Basic validation
+    if (!title.trim()) {
+      toast({
+        title: "Error de validación",
+        description: "El título es obligatorio",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!age.trim()) {
+      toast({
+        title: "Error de validación",
+        description: "La edad objetivo es obligatoria",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (timeline.length === 0) {
+      toast({
+        title: "Error de validación",
+        description: "La lección debe tener al menos un item en el timeline",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    saveMutation.mutate();
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,9 +156,13 @@ export default function LessonEditorPage() {
                 <Eye className="w-4 h-4 mr-2" />
                 Vista Previa
               </Button>
-              <Button data-testid="button-save">
+              <Button
+                onClick={handleSave}
+                disabled={saveMutation.isPending}
+                data-testid="button-save"
+              >
                 <Save className="w-4 h-4 mr-2" />
-                Guardar
+                {saveMutation.isPending ? "Guardando..." : "Guardar"}
               </Button>
             </div>
           </div>

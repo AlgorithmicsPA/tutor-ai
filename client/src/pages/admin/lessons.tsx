@@ -54,7 +54,7 @@ export default function AdminLessonsPage() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <Link href="/">
+              <Link href="/admin">
                 <Button
                   variant="ghost"
                   size="icon"

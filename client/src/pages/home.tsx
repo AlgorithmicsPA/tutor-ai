@@ -1,203 +1,166 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Settings } from "lucide-react";
+import { BookOpen, Clock, Globe, Play, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LessonRenderer } from "@/components/LessonRenderer";
-import { ChatInterface } from "@/components/ChatInterface";
-import { ProviderSelector } from "@/components/ProviderSelector";
-import { ProgressIndicator } from "@/components/ProgressIndicator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import type { Lesson } from "@shared/schema";
 import { motion } from "framer-motion";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Lesson, LessonDSL, UserProgress, InsertUserProgress } from "@shared/schema";
-
-// For demo purposes, using a static user ID. In production, this would come from authentication
-const DEMO_USER_ID = "demo-user-001";
 
 export default function Home() {
-  const [provider, setProvider] = useState<"openai" | "gemini">("openai");
-  const [quizScores, setQuizScores] = useState<{ index: number; score: number }[]>([]);
-  const [completedItems, setCompletedItems] = useState<number[]>([]);
-
-  // Fetch the demo lesson from the database
-  const { data: lessonData, isLoading, error } = useQuery<Lesson>({
-    queryKey: ["/api/lessons", "demo-01"],
-    queryFn: async () => {
-      const res = await fetch("/api/lessons/demo-01");
-      if (!res.ok) throw new Error("Failed to fetch lesson");
-      return res.json();
-    },
+  const { data: lessonsData, isLoading } = useQuery<Lesson[]>({
+    queryKey: ["/api/lessons"],
   });
 
-  // Fetch user progress
-  const { data: progressData } = useQuery<UserProgress>({
-    queryKey: ["/api/progress", DEMO_USER_ID, "demo-01"],
-    queryFn: async () => {
-      const res = await fetch(`/api/progress/${DEMO_USER_ID}/demo-01`);
-      if (!res.ok) throw new Error("Failed to fetch progress");
-      return res.json();
-    },
-    enabled: !!lessonData, // Only fetch progress after lesson is loaded
-  });
-
-  // Sync local state with progress data
-  useEffect(() => {
-    if (progressData) {
-      setQuizScores(progressData.quizScores || []);
-      setCompletedItems(progressData.completedItems || []);
-    }
-  }, [progressData]);
-
-  // Mutation to save progress
-  const saveProgressMutation = useMutation({
-    mutationFn: async (data: InsertUserProgress) => {
-      return apiRequest<UserProgress>("POST", "/api/progress", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/progress", DEMO_USER_ID, "demo-01"] });
-    },
-  });
-
-  // Transform database lesson to DSL format
-  const lesson: LessonDSL | null = lessonData
-    ? {
-        meta: {
-          id: lessonData.lessonId,
-          title: lessonData.title,
-          age: lessonData.age,
-          lang: lessonData.lang,
-        },
-        objectives: lessonData.objectives,
-        timeline: lessonData.timeline,
-        adaptation: lessonData.adaptation || undefined,
-      }
-    : null;
-
-  // Handle quiz completion - prevents duplicates by index
-  const handleQuizComplete = (itemIndex: number, score: number) => {
-    // Remove any existing entry for this quiz index and add the new one
-    const filteredQuizScores = quizScores.filter(q => q.index !== itemIndex);
-    const newQuizScores = [...filteredQuizScores, { index: itemIndex, score }];
-    
-    // Add to completed items (Set ensures uniqueness)
-    const newCompletedItems = [...new Set([...completedItems, itemIndex])];
-    
-    setQuizScores(newQuizScores);
-    setCompletedItems(newCompletedItems);
-
-    // Save progress to database (POST endpoint handles upsert)
-    saveProgressMutation.mutate({
-      userId: DEMO_USER_ID,
-      lessonId: "demo-01",
-      quizScores: newQuizScores,
-      completedItems: newCompletedItems,
-      lastPosition: Math.max(...newCompletedItems, 0),
-      completed: newCompletedItems.length === lessonData?.timeline.length,
-    });
-  };
+  // Filter for published lessons only (double-check even though backend filters)
+  const lessons = lessonsData?.filter(lesson => lesson.published);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-10 backdrop-blur-sm bg-background/80 border-b border-border">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      {/* Hero Header */}
+      <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <h1 className="text-2xl md:text-3xl font-bold font-display text-foreground">
+              <h1 className="text-3xl md:text-4xl font-bold font-display text-foreground">
                 Tutor IA
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Plataforma de aprendizaje interactivo
+              <p className="text-sm md:text-base text-muted-foreground mt-1">
+                Aprende sobre Inteligencia Artificial de forma divertida
               </p>
             </motion.div>
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="flex items-center gap-3"
-            >
-              <Link href="/admin/lessons">
-                <Button variant="outline" data-testid="button-admin">
-                  <Settings className="w-4 h-4 mr-2" />
-                  Gestionar Lecciones
-                </Button>
-              </Link>
-              <ProviderSelector value={provider} onChange={setProvider} />
-            </motion.div>
+            <Link href="/admin">
+              <Button variant="outline" size="sm" data-testid="button-admin">
+                <Settings className="w-4 h-4 mr-2" />
+                Administración
+              </Button>
+            </Link>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Lesson Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              {isLoading ? (
-                <div className="space-y-4">
-                  <Skeleton className="h-12 w-3/4" data-testid="skeleton-lesson-title" />
-                  <Skeleton className="h-32 w-full" data-testid="skeleton-lesson-content" />
-                  <Skeleton className="h-48 w-full" data-testid="skeleton-lesson-content" />
-                </div>
-              ) : error ? (
-                <div 
-                  className="p-6 border border-destructive/50 rounded-lg bg-destructive/10"
-                  data-testid="error-lesson-load"
-                >
-                  <h2 className="text-lg font-semibold text-destructive mb-2">
-                    Error cargando la lección
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {error instanceof Error ? error.message : "Error desconocido"}
-                  </p>
-                </div>
-              ) : lesson ? (
-                <>
-                  <ProgressIndicator
-                    completedItems={completedItems}
-                    totalItems={lesson.timeline.length}
-                    quizScores={quizScores}
-                  />
-                  <LessonRenderer 
-                    lesson={lesson} 
-                    onQuizComplete={handleQuizComplete}
-                    userQuizScores={quizScores}
-                  />
-                </>
-              ) : null}
-            </motion.div>
+      <main className="container mx-auto px-4 py-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-6xl mx-auto"
+        >
+          {/* Page Title */}
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              Lecciones Disponibles
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Selecciona una lección para comenzar tu viaje de aprendizaje sobre Inteligencia Artificial
+            </p>
           </div>
 
-          {/* Chat Sidebar */}
-          <div className="lg:col-span-1">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="lg:sticky lg:top-24"
-            >
-              <ChatInterface provider={provider} />
-            </motion.div>
-          </div>
-        </div>
+          {/* Lessons Grid */}
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="h-6 bg-muted rounded w-3/4" />
+                    <div className="h-4 bg-muted rounded w-1/2 mt-2" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-4 bg-muted rounded w-full" />
+                    <div className="h-4 bg-muted rounded w-5/6 mt-2" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : lessons && lessons.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {lessons.map((lesson, index) => (
+                <motion.div
+                  key={lesson.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card
+                    className="hover-elevate transition-all duration-300 h-full flex flex-col"
+                    data-testid={`card-lesson-${lesson.id}`}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <BookOpen className="w-8 h-8 text-primary flex-shrink-0" />
+                        <Badge variant="secondary" data-testid={`badge-age-${lesson.id}`}>
+                          {lesson.age}
+                        </Badge>
+                      </div>
+                      <CardTitle className="text-xl line-clamp-2">
+                        {lesson.title}
+                      </CardTitle>
+                      <CardDescription className="line-clamp-3">
+                        {lesson.objectives.slice(0, 2).join(" • ")}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex-1 flex flex-col justify-between">
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          {lesson.lang}
+                        </Badge>
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {lesson.timeline.length} actividades
+                        </Badge>
+                      </div>
+                      <Link href={`/lessons/${lesson.lessonId}`} className="w-full">
+                        <Button
+                          size="lg"
+                          className="w-full"
+                          data-testid={`button-start-${lesson.id}`}
+                        >
+                          <Play className="w-4 h-4 mr-2" />
+                          Comenzar Lección
+                        </Button>
+                      </Link>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <Card className="max-w-md mx-auto text-center">
+              <CardContent className="pt-12 pb-12">
+                <BookOpen className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-xl font-semibold mb-2">No hay lecciones disponibles</h3>
+                <p className="text-muted-foreground mb-6">
+                  Actualmente no hay lecciones publicadas. Por favor, contacta a tu educador.
+                </p>
+                <Link href="/admin">
+                  <Button variant="outline" data-testid="button-admin-empty">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Ir a Administración
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+          )}
+        </motion.div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-border mt-16">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-          <p className="text-center text-sm text-muted-foreground">
-            Tutor IA - Aprendizaje personalizado con inteligencia artificial
-          </p>
+      <footer className="border-t bg-background/80 mt-16">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              Tutor IA - Aprendizaje personalizado con Inteligencia Artificial
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Diseñado para niños de 7-9 años
+            </p>
+          </div>
         </div>
       </footer>
     </div>

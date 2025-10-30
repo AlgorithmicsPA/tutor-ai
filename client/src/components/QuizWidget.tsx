@@ -2,7 +2,7 @@ import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Check, X } from "lucide-react";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest } from "@/lib/queryClient";
 import type { GradeRequest, GradeResponse } from "@shared/schema";
 
 interface QuizWidgetProps {
@@ -22,7 +22,7 @@ export function QuizWidget({ question, choices, answer, lessonId = "demo-01" }: 
     
     setIsSubmitting(true);
     try {
-      const data = await apiRequest<GradeResponse, GradeRequest>(
+      const data = await apiRequest<GradeResponse>(
         "POST",
         "/api/grade",
         {
@@ -102,7 +102,8 @@ export function QuizWidget({ question, choices, answer, lessonId = "demo-01" }: 
         <Button
           onClick={handleSubmit}
           disabled={picked === null || isSubmitting}
-          className="w-full py-3 font-semibold"
+          className="w-full font-semibold"
+          size="lg"
           data-testid="button-submit-quiz"
         >
           {isSubmitting ? "Comprobando..." : "Comprobar Respuesta"}

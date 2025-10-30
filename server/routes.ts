@@ -82,7 +82,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ];
 
         const response = await openai.chat.completions.create({
-          model: "gpt-5-mini", // Using gpt-5-mini for faster, cost-effective tutoring responses
+          model: "gpt-5", // Using gpt-5 released August 7, 2025
           messages: chatMessages,
           max_completion_tokens: 8192,
         });

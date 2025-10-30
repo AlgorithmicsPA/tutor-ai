@@ -15,7 +15,7 @@ export const demoLesson: LessonDSL = {
   timeline: [
     {
       type: "tutor_say",
-      text: "¡Hola! Soy Profe DANA y hoy vamos a aprender a sumar de una manera muy divertida usando frutas. 🍎🍌🍊",
+      text: "¡Hola! Soy Profe DANA y hoy vamos a aprender a sumar de una manera muy divertida usando frutas como manzanas, plátanos y naranjas.",
       voice: true,
       role: "guide",
     },

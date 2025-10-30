@@ -42,7 +42,7 @@ export function ChatInterface({ provider }: ChatInterfaceProps) {
     setIsLoading(true);
 
     try {
-      const data = await apiRequest<TutorResponse, TutorRequest>(
+      const data = await apiRequest<TutorResponse>(
         "POST",
         "/api/tutor",
         {

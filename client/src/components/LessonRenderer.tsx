@@ -83,8 +83,11 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
               return (
                 <TutorMessage
                   key={index}
+                  messageId={`${lesson.meta.id}-msg-${index}`}
                   text={item.text}
                   role={item.role}
+                  enableVoice={item.voice ?? true}
+                  autoplay={item.voice === true}
                 />
               );
             case "show_image":

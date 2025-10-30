@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
+import { Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { LessonRenderer } from "@/components/LessonRenderer";
 import { ChatInterface } from "@/components/ChatInterface";
 import { ProviderSelector } from "@/components/ProviderSelector";
@@ -116,7 +119,14 @@ export default function Home() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
+              className="flex items-center gap-3"
             >
+              <Link href="/admin/lessons">
+                <Button variant="outline" data-testid="button-admin">
+                  <Settings className="w-4 h-4 mr-2" />
+                  Gestionar Lecciones
+                </Button>
+              </Link>
               <ProviderSelector value={provider} onChange={setProvider} />
             </motion.div>
           </div>

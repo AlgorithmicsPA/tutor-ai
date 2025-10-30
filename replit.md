@@ -102,6 +102,41 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - Lesson authoring interface at `/admin/lessons`
 - Real-time preview and validation system
 
+## Automatic Lesson Generation System
+
+**AI-Powered Content Creation:**
+- Endpoint: `POST /api/lessons/generate`
+- Input: Lesson metadata (title, age, objectives, language)
+- Output: Complete lesson timeline with educational content
+- AI Model: OpenAI GPT-5 via Replit AI Integrations
+
+**Content Types Generated:**
+- Tutor messages (`tutor_say`): Friendly explanations adapted to child's age
+- Multiple-choice quizzes (`quiz`): 4-option questions with correct answer index
+- Reflection prompts (`reflection`): Open-ended thinking exercises
+- Educational images (`show_image`): Auto-mapped from AI descriptions to pre-generated assets
+
+**Image Processing Pipeline:**
+1. AI generates `GENERATE_IMAGE: <description>` markers in timeline
+2. Backend `getEducationalImage()` function maps descriptions to pre-generated educational images
+3. Keyword-based matching (robot, ChatGPT, Gemini, AI diagrams, comparisons)
+4. Five high-quality child-friendly AI illustrations stored in `attached_assets/generated_images/`
+5. Automatic replacement of markers with actual image paths before returning to client
+
+**Educational Images Library:**
+- Robot teacher with diverse children (`Robot_teacher_with_diverse_children_bc4de1b4.png`)
+- How AI works diagram (`How_AI_works_simple_diagram_62b5bad7.png`)
+- ChatGPT character illustration (`ChatGPT_friendly_character_illustration_431b9259.png`)
+- Gemini star character (`Gemini_friendly_star_character_8a90e0c2.png`)
+- ChatGPT vs Gemini comparison (`ChatGPT_vs_Gemini_comparison_illustration_b8018ed9.png`)
+
+**Frontend Integration:**
+- "Generar Automáticamente" button in Metadata tab of lesson editor
+- TanStack Query mutation with loading states and error handling
+- Automatic validation of required metadata before generation
+- Success toast notification with generated timeline preview
+- Seamless integration with TimelineBuilder for further editing
+
 ## External Dependencies
 
 ### AI Services

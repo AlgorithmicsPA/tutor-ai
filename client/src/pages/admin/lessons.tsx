@@ -8,7 +8,7 @@ import type { Lesson } from "@shared/schema";
 
 export default function AdminLessonsPage() {
   const { data: lessons, isLoading } = useQuery<Lesson[]>({
-    queryKey: ["/api/lessons"],
+    queryKey: ["/api/admin/lessons"],
   });
 
   return (

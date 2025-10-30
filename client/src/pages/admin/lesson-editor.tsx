@@ -66,8 +66,8 @@ export default function LessonEditorPage() {
       }
     },
     onSuccess: (data) => {
-      // Invalidate lessons list
-      queryClient.invalidateQueries({ queryKey: ["/api/lessons"] });
+      // Invalidate admin lessons list
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/lessons"] });
       
       // Invalidate the specific lesson - use the returned lessonId for new lessons
       if (lessonId === "new") {

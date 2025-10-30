@@ -141,13 +141,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Lesson CRUD endpoints
   
-  // Get all published lessons
+  // Get all published lessons (for students)
   app.get("/api/lessons", async (_req, res) => {
     try {
       const lessons = await storage.getPublishedLessons();
       res.json(lessons);
     } catch (error: any) {
       console.error("Failed to fetch lessons:", error);
+      res.status(500).json({ error: "Failed to fetch lessons" });
+    }
+  });
+
+  // Get all lessons including unpublished (for admin)
+  app.get("/api/admin/lessons", async (_req, res) => {
+    try {
+      const lessons = await storage.getAllLessons();
+      res.json(lessons);
+    } catch (error: any) {
+      console.error("Failed to fetch admin lessons:", error);
       res.status(500).json({ error: "Failed to fetch lessons" });
     }
   });

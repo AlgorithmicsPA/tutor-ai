@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
 import type { Lesson, TimelineItem, InsertLesson, LessonDSL, GenerateLessonResponse } from "@shared/schema";
 import { useState, useEffect, useMemo } from "react";
 import { TimelineBuilder } from "@/components/TimelineBuilder";
@@ -30,6 +31,7 @@ export default function LessonEditorPage() {
   const [lang, setLang] = useState("es");
   const [objectives, setObjectives] = useState("");
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [published, setPublished] = useState(false);
 
   // Update form when lesson data loads
   useEffect(() => {
@@ -39,6 +41,7 @@ export default function LessonEditorPage() {
       setLang(lesson.lang);
       setObjectives(lesson.objectives.join("\n"));
       setTimeline(lesson.timeline);
+      setPublished(lesson.published);
     }
   }, [lesson]);
 
@@ -54,7 +57,7 @@ export default function LessonEditorPage() {
         lang,
         objectives: objectivesArray,
         timeline,
-        published: lesson?.published ?? false, // Preserve existing published state
+        published,
       };
 
       if (lessonId === "new" || !lesson) {
@@ -331,6 +334,23 @@ export default function LessonEditorPage() {
                         rows={5}
                         value={objectives}
                         onChange={(e) => setObjectives(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="published" className="text-base font-medium">
+                          Publicar Lección
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Las lecciones publicadas serán visibles para los estudiantes
+                        </p>
+                      </div>
+                      <Switch
+                        id="published"
+                        checked={published}
+                        onCheckedChange={setPublished}
+                        data-testid="switch-published"
                       />
                     </div>
 

@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRoute, Link, useLocation } from "wouter";
-import { ArrowLeft, Save, Eye, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, Eye, Sparkles, Globe, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -337,20 +337,38 @@ export default function LessonEditorPage() {
                       />
                     </div>
 
-                    <div className="flex items-center justify-between p-4 bg-card border border-border rounded-lg">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="published" className="text-base font-medium">
-                          Publicar Lección
-                        </Label>
-                        <p className="text-sm text-muted-foreground">
-                          Las lecciones publicadas serán visibles para los estudiantes
-                        </p>
+                    <div className="flex items-center justify-between p-6 bg-gradient-to-r from-primary/10 to-primary/5 border-2 border-primary/30 rounded-lg">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-5 h-5 text-primary" />
+                          <Label htmlFor="published" className="text-lg font-semibold text-foreground cursor-pointer">
+                            Publicar Lección
+                          </Label>
+                        </div>
+                        <div className="flex items-center gap-2 ml-7">
+                          {published ? (
+                            <>
+                              <CheckCircle className="w-4 h-4 text-green-600" />
+                              <p className="text-sm text-muted-foreground">
+                                Esta lección es visible para los estudiantes
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="w-4 h-4 text-orange-600" />
+                              <p className="text-sm text-muted-foreground">
+                                Esta lección es un borrador y NO es visible para los estudiantes
+                              </p>
+                            </>
+                          )}
+                        </div>
                       </div>
                       <Switch
                         id="published"
                         checked={published}
                         onCheckedChange={setPublished}
                         data-testid="switch-published"
+                        className="scale-125"
                       />
                     </div>
 
@@ -395,7 +413,24 @@ export default function LessonEditorPage() {
               <TabsContent value="preview" className="mt-6">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Vista Previa de la Lección</CardTitle>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle>Vista Previa de la Lección</CardTitle>
+                        <CardDescription className="mt-2">
+                          {published 
+                            ? "Esta lección está publicada y visible para estudiantes" 
+                            : "Activa 'Publicar Lección' en Metadatos para que sea visible"}
+                        </CardDescription>
+                      </div>
+                      {published && lesson && (
+                        <Link href={`/lessons/${lesson.lessonId}`} target="_blank">
+                          <Button size="lg" data-testid="button-view-lesson">
+                            <Eye className="w-4 h-4 mr-2" />
+                            Ver Lección Completa
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
                   </CardHeader>
                   <CardContent className="pt-6">
                     <div className="bg-muted/30 rounded-lg p-6 border border-muted">

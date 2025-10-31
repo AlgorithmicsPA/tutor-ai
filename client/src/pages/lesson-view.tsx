@@ -28,6 +28,7 @@ export default function LessonViewPage() {
       },
       objectives: lesson.objectives,
       timeline: lesson.timeline,
+      modules: lesson.modules, // Include modules for orchestrator-generated lessons
     };
   }, [lesson]);
 

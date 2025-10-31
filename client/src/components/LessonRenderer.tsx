@@ -5,6 +5,14 @@ import { QuizWidget } from "./QuizWidget";
 import { OrderStepsWidget } from "./OrderStepsWidget";
 import { ReflectionPrompt } from "./ReflectionPrompt";
 import { AdaptivePathIndicator } from "./AdaptivePathIndicator";
+import { TheoryBlockWidget } from "./TheoryBlockWidget";
+import { ComparisonWidget } from "./ComparisonWidget";
+import { PromptEditorWidget } from "./PromptEditorWidget";
+import { ChatSimulatorWidget } from "./ChatSimulatorWidget";
+import { MiniProjectWidget } from "./MiniProjectWidget";
+import { TimelineInteractiveWidget } from "./TimelineInteractiveWidget";
+import { HotspotDiagramWidget } from "./HotspotDiagramWidget";
+import { CodeExerciseWidget } from "./CodeExerciseWidget";
 
 interface LessonRendererProps {
   lesson: LessonDSL;
@@ -104,22 +112,82 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
             icon={item.icon}
           />
         );
-      // TODO: Add new widget types here
       case "theory_block":
-      case "prompt_editor":
-      case "chat_simulator":
-      case "code_exercise":
-      case "comparison":
-      case "timeline_interactive":
-      case "hotspot_diagram":
-      case "mini_project":
-        // Placeholder for new widgets - will be implemented next
         return (
-          <div key={key} className="p-4 bg-muted rounded-lg">
-            <p className="text-sm text-muted-foreground">
-              Widget "{item.type}" - Próximamente
-            </p>
-          </div>
+          <TheoryBlockWidget
+            key={key}
+            title={item.title}
+            content={item.content}
+            keyPoints={item.keyPoints}
+            imageSrc={item.imageSrc}
+            imageAlt={item.imageAlt}
+          />
+        );
+      case "prompt_editor":
+        return (
+          <PromptEditorWidget
+            key={key}
+            instruction={item.instruction}
+            placeholder={item.placeholder}
+            samplePrompts={item.samplePrompts}
+            validationCriteria={item.validationCriteria}
+          />
+        );
+      case "chat_simulator":
+        return (
+          <ChatSimulatorWidget
+            key={key}
+            scenario={item.scenario}
+            systemPrompt={item.systemPrompt}
+            starterMessages={item.starterMessages}
+          />
+        );
+      case "code_exercise":
+        return (
+          <CodeExerciseWidget
+            key={key}
+            instruction={item.instruction}
+            language={item.language}
+            starterCode={item.starterCode}
+            hints={item.hints}
+            expectedOutput={item.expectedOutput}
+          />
+        );
+      case "comparison":
+        return (
+          <ComparisonWidget
+            key={key}
+            title={item.title}
+            leftItem={item.leftItem}
+            rightItem={item.rightItem}
+          />
+        );
+      case "timeline_interactive":
+        return (
+          <TimelineInteractiveWidget
+            key={key}
+            title={item.title}
+            events={item.events}
+          />
+        );
+      case "hotspot_diagram":
+        return (
+          <HotspotDiagramWidget
+            key={key}
+            title={item.title}
+            imageSrc={item.imageSrc}
+            hotspots={item.hotspots}
+          />
+        );
+      case "mini_project":
+        return (
+          <MiniProjectWidget
+            key={key}
+            title={item.title}
+            description={item.description}
+            steps={item.steps}
+            estimatedTime={item.estimatedTime}
+          />
         );
       default:
         return null;

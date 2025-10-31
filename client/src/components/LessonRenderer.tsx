@@ -120,17 +120,17 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
             content={item.content}
             keyPoints={item.keyPoints}
             imageSrc={item.imageSrc}
-            imageAlt={item.imageAlt}
+            imageAlt={item.title}
           />
         );
       case "prompt_editor":
         return (
           <PromptEditorWidget
             key={key}
-            instruction={item.instruction}
-            placeholder={item.placeholder}
-            samplePrompts={item.samplePrompts}
-            validationCriteria={item.validationCriteria}
+            instruction={`${item.description}\n\n${item.challenge}`}
+            placeholder={item.starterPrompt}
+            samplePrompts={item.hints}
+            validationCriteria={item.expectedConcepts}
           />
         );
       case "chat_simulator":
@@ -146,11 +146,11 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
         return (
           <CodeExerciseWidget
             key={key}
-            instruction={item.instruction}
+            instruction={item.description}
             language={item.language}
             starterCode={item.starterCode}
             hints={item.hints}
-            expectedOutput={item.expectedOutput}
+            expectedOutput={item.solution}
           />
         );
       case "comparison":
@@ -158,8 +158,14 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
           <ComparisonWidget
             key={key}
             title={item.title}
-            leftItem={item.leftItem}
-            rightItem={item.rightItem}
+            leftItem={{
+              label: item.leftSide.title,
+              features: item.leftSide.content.split('\n').filter(Boolean)
+            }}
+            rightItem={{
+              label: item.rightSide.title,
+              features: item.rightSide.content.split('\n').filter(Boolean)
+            }}
           />
         );
       case "timeline_interactive":
@@ -167,7 +173,11 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
           <TimelineInteractiveWidget
             key={key}
             title={item.title}
-            events={item.events}
+            events={item.events.map(e => ({
+              year: e.date,
+              title: e.title,
+              description: e.description
+            }))}
           />
         );
       case "hotspot_diagram":
@@ -175,8 +185,14 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
           <HotspotDiagramWidget
             key={key}
             title={item.title}
-            imageSrc={item.imageSrc}
-            hotspots={item.hotspots}
+            imageSrc={item.imageSrc || ""}
+            hotspots={item.hotspots.map(h => ({
+              id: h.id,
+              label: h.title,
+              description: h.content,
+              x: h.x,
+              y: h.y
+            }))}
           />
         );
       case "mini_project":
@@ -185,8 +201,11 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
             key={key}
             title={item.title}
             description={item.description}
-            steps={item.steps}
-            estimatedTime={item.estimatedTime}
+            steps={item.steps.map(s => ({
+              description: s.title,
+              hint: s.description
+            }))}
+            estimatedTime={item.estimatedTime ? `${item.estimatedTime} min` : undefined}
           />
         );
       default:

@@ -14,6 +14,7 @@ import {
   type GenerateLessonResponse
 } from "@shared/schema";
 import { storage } from "./storage";
+import { setupAuth } from "./auth";
 
 // This is using Replit's AI Integrations service, which provides OpenAI-compatible API access
 // without requiring your own OpenAI API key. Charges are billed to your Replit credits.
@@ -39,6 +40,9 @@ function scoreQuiz(answerIdx: number, userIdx: number): number {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication routes: /api/register, /api/login, /api/logout, /api/user
+  // Reference: blueprint:javascript_auth_all_persistance
+  setupAuth(app);
   
   // Health check endpoint
   app.get("/healthz", (_req, res) => {

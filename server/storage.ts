@@ -1,17 +1,24 @@
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { eq, and } from "drizzle-orm";
+import session from "express-session";
+import connectPg from "connect-pg-simple";
 import {
   type Lesson,
   type InsertLesson,
   type UserProgress,
   type InsertUserProgress,
+  type User,
+  type InsertUser,
   lessons,
   userProgress,
+  users,
 } from "@shared/schema";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
+
+const PostgresSessionStore = connectPg(session);
 
 export interface IStorage {
   // Lesson CRUD
@@ -27,9 +34,42 @@ export interface IStorage {
   getUserProgress(userId: string, lessonId: string): Promise<UserProgress | undefined>;
   createUserProgress(progress: InsertUserProgress): Promise<UserProgress>;
   updateUserProgress(id: number, progress: Partial<InsertUserProgress>): Promise<UserProgress | undefined>;
+
+  // User CRUD
+  getUser(id: number): Promise<User | undefined>;
+  getUserByUsername(username: string): Promise<User | undefined>;
+  createUser(user: InsertUser): Promise<User>;
+  
+  // Session store
+  sessionStore: session.Store;
 }
 
 export class DbStorage implements IStorage {
+  sessionStore: session.Store;
+
+  constructor() {
+    this.sessionStore = new PostgresSessionStore({
+      conString: process.env.DATABASE_URL,
+      createTableIfMissing: true,
+    });
+  }
+
+  // User methods
+  async getUser(id: number): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id));
+    return result[0];
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.username, username));
+    return result[0];
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const result = await db.insert(users).values(user).returning();
+    return result[0];
+  }
+
   // Lesson methods
   async getAllLessons(): Promise<Lesson[]> {
     return await db.select().from(lessons);

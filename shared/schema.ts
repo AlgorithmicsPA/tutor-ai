@@ -118,6 +118,25 @@ export const gradeResponseSchema = z.object({
 export type GradeResponse = z.infer<typeof gradeResponseSchema>;
 
 // Database Tables
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
+  username: varchar("username", { length: 255 }).notNull().unique(),
+  password: varchar("password", { length: 255 }).notNull(),
+  role: varchar("role", { length: 20 }).notNull().default("student"),
+  name: varchar("name", { length: 255 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
 export const lessons = pgTable("lessons", {
   id: serial("id").primaryKey(),
   lessonId: varchar("lesson_id", { length: 255 }).notNull().unique(),

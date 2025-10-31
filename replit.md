@@ -27,6 +27,14 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - **Navigation**: Clear separation maintained - admin buttons always return to /admin context
 - **Security**: Separate endpoints ensure students never see draft content; role-based access enforced
 
+### Complete Admin Panel with Sidebar Navigation
+- **AdminLayout**: Shadcn sidebar-based navigation for all admin routes (Dashboard, Lecciones, Usuarios, Seguimiento)
+- **User Management Page**: Full CRUD interface for managing users with create/edit modal and interactive table
+- **Progress Tracking Page**: Comprehensive student progress monitoring with aggregated statistics and individual metrics
+- **Division-by-Zero Protection**: Robust validation in both frontend and backend to prevent NaN values in progress calculations
+- **Quiz Score Normalization**: Backend handles both legacy (numeric) and current (object) quiz score formats
+- **Responsive Design**: Material Design-based admin interface with sidebar collapsing and mobile support
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -61,6 +69,9 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - `HomePage`: Student-facing lesson browser showing only published lessons (authentication required)
 - `LessonViewPage`: Student-facing lesson player with full interactive experience (authentication required)
 - `AdminDashboard`: Admin panel with statistics and quick actions (admin role required)
+- `AdminLayout`: Shadcn sidebar-based layout with navigation for all admin pages
+- `UsersPage`: User management interface with CRUD operations and role assignment
+- `ProgressPage`: Student progress tracking dashboard with aggregated metrics and individual student details
 
 ### Backend Architecture
 
@@ -87,6 +98,12 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
   - `/api/admin/lessons`: Admin endpoint returning ALL lessons (requires admin role)
   - `/api/lessons/:id`: Full CRUD for individual lessons (GET/POST/PUT/DELETE)
   - `/api/progress`: User progress tracking and quiz score persistence
+- **Admin Management**:
+  - `GET /api/admin/users`: List all users (requires admin role)
+  - `POST /api/admin/users`: Create new user with username, password, name, role (requires admin role)
+  - `PUT /api/admin/users/:id`: Update user details including role (requires admin role)
+  - `DELETE /api/admin/users/:id`: Delete user account (requires admin role)
+  - `GET /api/admin/progress`: Aggregated student progress data with division-by-zero protection (requires admin role)
 - **Health**: `/healthz`: Health check with provider availability status
 
 **AI Provider Strategy:**

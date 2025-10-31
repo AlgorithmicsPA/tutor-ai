@@ -25,34 +25,18 @@ interface LessonParams {
   objectives?: string[];
 }
 
-const ORCHESTRATOR_SYSTEM_PROMPT = `Eres un asistente experto en diseño educativo que ayuda a crear lecciones sobre Inteligencia Artificial.
+const ORCHESTRATOR_SYSTEM_PROMPT = `Eres un asistente que ayuda a planificar lecciones educativas.
 
-Tu trabajo es mantener una conversación natural y amigable para recopilar la siguiente información:
-1. **Título de la lección** - ¿Qué tema específico de IA quieren cubrir?
-2. **Audiencia** - ¿Para quién es? (niños 7-9, adolescentes 13-17, adultos 18-65, profesionales 65+)
-3. **Duración** - ¿Cuánto tiempo tienen? (10-240 minutos)
-4. **Nivel** - ¿Qué nivel? (principiante, intermedio, avanzado)
-5. **Tipo** - ¿Prefieren más teoría, más práctica, o balanceado?
-6. **Objetivos** - ¿Qué deberían aprender al terminar? (2-4 objetivos)
+Recopila esta información haciendo una pregunta a la vez:
+1. Tema de la lección
+2. Audiencia (niños, adolescentes, adultos, profesionales)
+3. Duración en minutos
+4. Nivel (principiante, intermedio, avanzado)
+5. Tipo (teoría, práctica, o balanceado)
 
-REGLAS IMPORTANTES:
-- Haz UNA pregunta a la vez
-- Sé conversacional y amigable, usando español
-- Confirma cada respuesta antes de continuar
-- Si el usuario da múltiples respuestas a la vez, está bien - confírmalas todas
-- Sugiere opciones cuando sea útil
-- Cuando tengas TODA la información, responde con: "¡Perfecto! Tengo todo listo. ¿Quieres que genere la lección ahora?"
-- NO generes la lección tú mismo, solo recopila la información
+Sé breve y amigable. Usa español. Cuando tengas toda la información, di: "¡Listo! ¿Quieres que genere la lección?"
 
-Ejemplo de flujo:
-Usuario: "Quiero una lección sobre IA"
-Tú: "¡Excelente! ¿Para quién será esta lección? Tengo opciones para:
-- Niños (7-9 años)
-- Adolescentes (13-17 años)
-- Adultos (18-65 años)
-- Profesionales (65+ años)"
-
-Inicia la conversación presentándote brevemente y preguntando qué tipo de lección quieren crear.`;
+Comienza saludando y preguntando sobre qué tema quieren la lección.`;
 
 export default function LessonOrchestrator() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -94,9 +78,18 @@ export default function LessonOrchestrator() {
         throw new Error("Faltan parámetros necesarios");
       }
 
+      // Map audience to age range for backward compatibility
+      const ageMap = {
+        children: "7-9",
+        teens: "13-17",
+        adults: "18-65",
+        professional: "65+"
+      };
+
       const response = await apiRequest<{ lesson: any }>("POST", "/api/lessons/generate", {
         title: params.title,
-        objectives: params.objectives || [],
+        age: ageMap[params.audience],
+        objectives: params.objectives || ["Comprender el tema", "Aplicar conocimientos"],
         audience: params.audience,
         duration: params.duration,
         level: params.level,
@@ -113,7 +106,7 @@ export default function LessonOrchestrator() {
       });
       
       // Redirect to lesson editor
-      setLocation(`/admin/lessons/${lesson.meta.id}/edit`);
+      setLocation(`/admin/lessons/${lesson.meta.id}`);
     },
     onError: (error: any) => {
       toast({
@@ -355,7 +348,7 @@ export default function LessonOrchestrator() {
               />
             </div>
 
-            {isComplete && params.title && params.audience && params.duration && params.level && params.type && (
+            {params.title && params.audience && params.duration && params.level && params.type && (
               <Button
                 onClick={handleGenerate}
                 disabled={generateMutation.isPending}
@@ -369,7 +362,7 @@ export default function LessonOrchestrator() {
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    <Wand2 className="h-4 w-4 mr-2" />
                     Generar Lección
                   </>
                 )}

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import type { Lesson, TimelineItem, InsertLesson, LessonDSL, GenerateLessonResponse } from "@shared/schema";
+import type { Lesson, TimelineItem, InsertLesson, LessonDSL, GenerateLessonResponse, Module } from "@shared/schema";
 import { useState, useEffect, useMemo } from "react";
 import { TimelineBuilder } from "@/components/TimelineBuilder";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -31,6 +31,7 @@ export default function LessonEditorPage() {
   const [lang, setLang] = useState("es");
   const [objectives, setObjectives] = useState("");
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
+  const [modules, setModules] = useState<Module[]>([]);  // NEW: State for modules
   const [published, setPublished] = useState(false);
 
   // Update form when lesson data loads
@@ -40,7 +41,13 @@ export default function LessonEditorPage() {
       setAge(lesson.age);
       setLang(lesson.lang);
       setObjectives(lesson.objectives.join("\n"));
-      setTimeline(lesson.timeline);
+      // Load BOTH modules and timeline to preserve whichever format exists
+      if (lesson.modules) {
+        setModules(lesson.modules);
+      }
+      if (lesson.timeline) {
+        setTimeline(lesson.timeline);
+      }
       setPublished(lesson.published);
     }
   }, [lesson]);
@@ -56,7 +63,9 @@ export default function LessonEditorPage() {
         age,
         lang,
         objectives: objectivesArray,
-        timeline,
+        // Include BOTH modules and timeline to preserve whichever format exists
+        modules: modules.length > 0 ? modules : undefined,
+        timeline: timeline.length > 0 ? timeline : undefined,
         published,
       };
 
@@ -111,7 +120,17 @@ export default function LessonEditorPage() {
       });
     },
     onSuccess: (data) => {
-      setTimeline(data.timeline as TimelineItem[]);
+      // Handle BOTH modules and timeline formats from the orchestrator
+      if (data.modules && data.modules.length > 0) {
+        setModules(data.modules);
+        // Clear timeline if modules are present (new format)
+        setTimeline([]);
+      } else if (data.timeline && data.timeline.length > 0) {
+        setTimeline(data.timeline);
+        // Clear modules if timeline is present (legacy format)
+        setModules([]);
+      }
+      
       toast({
         title: "¡Contenido generado!",
         description: "La lección ha sido generada automáticamente. Revisa y ajusta según necesites.",
@@ -179,10 +198,12 @@ export default function LessonEditorPage() {
       return;
     }
 
-    if (timeline.length === 0) {
+    // Accept lessons with EITHER modules OR timeline
+    const hasContent = modules.length > 0 || timeline.length > 0;
+    if (!hasContent) {
       toast({
         title: "Error de validación",
-        description: "La lección debe tener al menos un item en el timeline",
+        description: "La lección debe tener contenido (módulos o timeline)",
         variant: "destructive",
       });
       return;
@@ -203,9 +224,11 @@ export default function LessonEditorPage() {
         lang: lang || "es",
       },
       objectives: objectivesArray,
-      timeline: timeline,
+      // Include BOTH modules and timeline for preview - LessonRenderer handles both
+      modules: modules.length > 0 ? modules : undefined,
+      timeline: timeline.length > 0 ? timeline : undefined,
     };
-  }, [title, age, lang, objectives, timeline, lesson?.lessonId]);
+  }, [title, age, lang, objectives, modules, timeline, lesson?.lessonId]);
 
   return (
     <div className="min-h-screen bg-background">

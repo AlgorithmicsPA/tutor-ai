@@ -11,6 +11,7 @@ import Home from "@/pages/home";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminLessonsPage from "@/pages/admin/lessons";
 import LessonEditorPage from "@/pages/admin/lesson-editor";
+import LessonOrchestrator from "@/pages/admin/lesson-orchestrator";
 import UsersPage from "@/pages/admin/users";
 import ProgressPage from "@/pages/admin/progress";
 import LessonViewPage from "@/pages/lesson-view";
@@ -45,6 +46,11 @@ function Router() {
       <ProtectedRoute 
         path="/admin/lessons/:lessonId" 
         component={() => <AdminPage component={LessonEditorPage} />} 
+        requireAdmin={true} 
+      />
+      <ProtectedRoute 
+        path="/admin/orchestrator" 
+        component={() => <AdminPage component={LessonOrchestrator} />} 
         requireAdmin={true} 
       />
       <ProtectedRoute 

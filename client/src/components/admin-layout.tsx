@@ -6,6 +6,7 @@ import {
   BarChart3,
   LogOut,
   Home,
+  Wand2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +36,11 @@ const menuItems = [
     title: "Lecciones",
     url: "/admin/lessons",
     icon: BookOpen,
+  },
+  {
+    title: "Orquestador IA",
+    url: "/admin/orchestrator",
+    icon: Wand2,
   },
   {
     title: "Usuarios",

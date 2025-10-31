@@ -43,14 +43,16 @@ export default function LessonOrchestrator() {
   const [input, setInput] = useState("");
   const [params, setParams] = useState<LessonParams>({});
   const [isComplete, setIsComplete] = useState(false);
+  const [showOptimizeButton, setShowOptimizeButton] = useState(false);
   const { toast } = useToast();
   const [, setLocation] = useLocation();
 
   const chatMutation = useMutation({
-    mutationFn: async (userMessage: string) => {
+    mutationFn: async ({ userMessage, customHistory }: { userMessage: string; customHistory?: Message[] }) => {
+      const historyToUse = customHistory !== undefined ? customHistory : messages;
       const response = await apiRequest<{ reply: string }>("POST", "/api/tutor", {
         messages: [
-          ...messages.map(m => ({ role: m.role, content: m.content })),
+          ...historyToUse.map(m => ({ role: m.role, content: m.content })),
           { role: "user", content: userMessage }
         ],
         system: ORCHESTRATOR_SYSTEM_PROMPT,
@@ -61,14 +63,75 @@ export default function LessonOrchestrator() {
     onSuccess: (reply) => {
       setMessages(prev => [...prev, { role: "assistant", content: reply }]);
       
+      // Show optimize button after first user message
+      if (messages.filter(m => m.role === "user").length === 1) {
+        setShowOptimizeButton(true);
+      }
+      
       // Check if conversation is complete
       if (reply.toLowerCase().includes("genere la lección") || 
           reply.toLowerCase().includes("crear la lección")) {
         setIsComplete(true);
+        setShowOptimizeButton(false);
       }
       
       // Try to extract parameters from the conversation
       extractParams([...messages, { role: "assistant", content: reply }]);
+    }
+  });
+
+  const optimizeMutation = useMutation({
+    mutationFn: async () => {
+      // Get the user's initial request
+      const userRequest = messages.filter(m => m.role === "user")[0]?.content || "";
+      
+      const optimizePrompt = `Eres un experto en diseño educativo. Un usuario ha solicitado crear una lección con esta petición inicial:
+
+"${userRequest}"
+
+Tu tarea es expandir esta petición en una descripción COMPLETA y DETALLADA que incluya TODOS estos elementos:
+
+1. **Tema específico**: ¿Sobre qué trata exactamente la lección?
+2. **Audiencia**: ¿Para quién es? (niños 7-9, adolescentes 13-17, adultos, profesionales)
+3. **Duración**: ¿Cuántos minutos debe durar? (sugerir entre 15-60 minutos)
+4. **Nivel**: ¿Qué nivel de conocimiento? (principiante, intermedio, avanzado)
+5. **Tipo de contenido**: ¿Más teoría, más práctica, o balanceado?
+6. **Objetivos**: ¿Qué aprenderán los estudiantes? (2-3 objetivos claros)
+
+Genera una descripción completa y natural en español, como si el usuario la hubiera escrito originalmente. 
+Sé específico y concreto. No uses formato de lista, sino un párrafo fluido.
+
+Ejemplo: "Necesito una lección de 30 minutos sobre cómo usar ChatGPT de manera efectiva para estudiantes universitarios de nivel principiante. Debe ser balanceada entre teoría y práctica. Los objetivos son: entender qué es ChatGPT y cómo funciona, aprender a escribir prompts efectivos, y practicar conversaciones básicas con la IA."`;
+
+      const response = await apiRequest<{ reply: string }>("POST", "/api/tutor", {
+        messages: [
+          { role: "user", content: optimizePrompt }
+        ],
+        provider: "openai"
+      });
+      
+      return response.reply;
+    },
+    onSuccess: (optimizedPrompt) => {
+      // Replace the conversation with the optimized prompt
+      const newUserMessage: Message = { role: "user", content: optimizedPrompt };
+      setMessages([newUserMessage]);
+      setShowOptimizeButton(false);
+      
+      // Send optimized prompt to the orchestrator with EMPTY history (fresh start)
+      chatMutation.mutate({ userMessage: optimizedPrompt, customHistory: [] });
+      
+      toast({
+        title: "Prompt optimizado",
+        description: "He generado una descripción más completa de tu petición",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No pude optimizar el prompt. Intenta nuevamente.",
+        variant: "destructive",
+      });
     }
   });
 
@@ -182,7 +245,7 @@ export default function LessonOrchestrator() {
     const userMessage: Message = { role: "user", content: input };
     setMessages(prev => [...prev, userMessage]);
     setInput("");
-    chatMutation.mutate(input);
+    chatMutation.mutate({ userMessage: input });
   };
 
   const handleGenerate = () => {
@@ -260,10 +323,35 @@ export default function LessonOrchestrator() {
                         </div>
                       </div>
                     ))}
+                    
+                    {showOptimizeButton && !chatMutation.isPending && !optimizeMutation.isPending && (
+                      <div className="flex justify-center">
+                        <Button
+                          onClick={() => optimizeMutation.mutate()}
+                          disabled={optimizeMutation.isPending}
+                          variant="outline"
+                          className="gap-2"
+                          data-testid="button-optimize-prompt"
+                        >
+                          <Sparkles className="h-4 w-4" />
+                          Generar Descripción Completa
+                        </Button>
+                      </div>
+                    )}
+                    
                     {chatMutation.isPending && (
                       <div className="flex justify-start">
                         <div className="bg-muted rounded-lg p-3">
                           <Loader2 className="h-4 w-4 animate-spin" />
+                        </div>
+                      </div>
+                    )}
+                    
+                    {optimizeMutation.isPending && (
+                      <div className="flex justify-center">
+                        <div className="bg-primary/10 rounded-lg p-3 flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          <span className="text-sm text-primary">Generando descripción optimizada...</span>
                         </div>
                       </div>
                     )}

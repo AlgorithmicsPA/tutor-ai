@@ -26,7 +26,13 @@ Lessons are defined using a structured **JSON schema** supporting a variety of i
 The platform features an **AI-powered lesson generation system** (`POST /api/lessons/generate`) that uses **OpenAI GPT-5** (via Replit AI Integrations) to create full lesson timelines based on metadata inputs (title, age, objectives). It generates tutor messages, quizzes, reflection prompts, and even suggests educational images, which are then mapped to pre-generated assets.
 
 ### LLM Orquestador - Conversational Lesson Creator
-A conversational AI assistant (`/admin/orchestrator`) that guides educators through lesson creation via natural dialogue. The orchestrator asks strategic questions to gather requirements (audience, duration, level, type, objectives), automatically extracts parameters from conversation context, and generates complete lessons with all new interactive widgets. Features real-time parameter detection, manual override capability, and seamless integration with the lesson generation system.
+A conversational AI assistant (`/admin/orchestrator`) that guides educators through lesson creation via natural dialogue. The orchestrator asks strategic questions to gather requirements (audience, duration, level, type, objectives), automatically extracts parameters from conversation context, and generates complete lessons with all new interactive widgets. Features real-time parameter detection, manual override capability, seamless integration with the lesson generation system, and **automatic database persistence** of generated lessons.
+
+**Key Features:**
+- **Smart Prompt Optimizer**: After the user's first message, a "Generar Descripción Completa" button appears that transforms vague requests (e.g., "IA para niños") into comprehensive, detailed prompts (including topic, audience, duration, level, type, and objectives). This dramatically improves parameter extraction accuracy.
+- **Automatic Parameter Extraction**: Detects audience (children/teens/adults/professional), duration (10-240 minutes), level (beginner/intermediate/advanced), and type (theory/practice/mixed) from natural conversation.
+- **Database Persistence**: Generated lessons are automatically saved to PostgreSQL with unique `lesson-{timestamp}` IDs and `published=false` by default.
+- **Seamless Editor Integration**: After generation, redirects to `/admin/lessons/{lessonId}` for immediate editing and publishing.
 
 ## External Dependencies
 

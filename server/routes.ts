@@ -11,6 +11,7 @@ import {
   type TutorResponse,
   type GradeResponse,
   type Lesson,
+  type InsertLesson,
   type GenerateLessonResponse,
   type InsertUser
 } from "@shared/schema";
@@ -535,7 +536,42 @@ Responde SOLO con el JSON de los módulos, sin texto adicional.`;
         }));
       }
       
-      res.json(parsedContent);
+      // Persist the generated lesson to the database
+      const lessonId = `lesson-${Date.now()}`;
+      const lessonData: InsertLesson = {
+        lessonId,
+        title,
+        age,
+        objectives,
+        lang: lang || "es",
+        audience,
+        duration,
+        level,
+        type,
+        modules: parsedContent.modules || [],
+        timeline: parsedContent.timeline || [],
+        published: false,
+      };
+
+      const savedLesson = await storage.createLesson(lessonData);
+
+      // Return the lesson with metadata for frontend redirect
+      res.json({
+        lesson: {
+          meta: {
+            id: savedLesson.lessonId,
+            title: savedLesson.title,
+            age: savedLesson.age,
+            objectives: savedLesson.objectives,
+            audience: savedLesson.audience,
+            duration: savedLesson.duration,
+            level: savedLesson.level,
+            type: savedLesson.type,
+          },
+          modules: savedLesson.modules,
+          timeline: savedLesson.timeline,
+        }
+      });
     } catch (error: any) {
       console.error("Failed to generate lesson:", error);
       res.status(500).json({ 

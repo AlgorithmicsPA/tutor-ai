@@ -121,6 +121,25 @@ export default function LessonOrchestrator() {
     const conversation = allMessages.map(m => `${m.role}: ${m.content}`).join("\n");
     const newParams: LessonParams = { ...params };
 
+    // Extract title from user's first message about the topic
+    if (!newParams.title) {
+      const userMessages = allMessages.filter(m => m.role === "user").map(m => m.content).join(" ");
+      
+      // Look for patterns like "lección sobre X", "enseñar X", "aprender X"
+      const topicMatch = userMessages.match(/(?:lección|lesson)\s+(?:sobre|about|de)\s+([^,\.]+)/i) ||
+                        userMessages.match(/(?:enseñar|teach|explicar)\s+([^,\.]+)/i) ||
+                        userMessages.match(/(?:cómo|how to)\s+([^,\.]+)/i);
+      
+      if (topicMatch) {
+        let title = topicMatch[1].trim();
+        // Clean up and capitalize
+        title = title.charAt(0).toUpperCase() + title.slice(1);
+        // Limit length
+        if (title.length > 60) title = title.substring(0, 60) + "...";
+        newParams.title = title;
+      }
+    }
+
     // Extract audience
     if (conversation.match(/niños|children|7-9/i)) newParams.audience = "children";
     else if (conversation.match(/adolescentes|teens|13-17/i)) newParams.audience = "teens";
@@ -133,12 +152,16 @@ export default function LessonOrchestrator() {
     else if (conversation.match(/avanzado|advanced/i)) newParams.level = "advanced";
 
     // Extract type
-    if (conversation.match(/teoría|theory|teórico/i) && !conversation.match(/práctica|practice/i)) {
-      newParams.type = "theory";
-    } else if (conversation.match(/práctica|practice|práctico/i) && !conversation.match(/teoría|theory/i)) {
-      newParams.type = "practice";
-    } else if (conversation.match(/balanceado|mixed|equilibrado|mixto/i)) {
+    const hasTheory = conversation.match(/teoría|theory|teórico/i);
+    const hasPractice = conversation.match(/práctica|practice|práctico/i);
+    const hasBalanced = conversation.match(/balancead[oa]|mixed|equilibrad[oa]|mixt[oa]|entre teoría y práctica|teoría y práctica/i);
+    
+    if (hasBalanced || (hasTheory && hasPractice)) {
       newParams.type = "mixed";
+    } else if (hasTheory && !hasPractice) {
+      newParams.type = "theory";
+    } else if (hasPractice && !hasTheory) {
+      newParams.type = "practice";
     }
 
     // Extract duration (look for numbers followed by "minutos" or standalone numbers in context)

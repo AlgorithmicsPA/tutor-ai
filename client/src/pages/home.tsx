@@ -1,13 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { BookOpen, Clock, Globe, Play, Settings } from "lucide-react";
+import { BookOpen, Clock, Globe, Play, Settings, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/hooks/use-auth";
 import type { Lesson } from "@shared/schema";
 import { motion } from "framer-motion";
 
 export default function Home() {
+  const { user, logoutMutation } = useAuth();
   const { data: lessonsData, isLoading } = useQuery<Lesson[]>({
     queryKey: ["/api/lessons"],
   });
@@ -20,7 +22,7 @@ export default function Home() {
       {/* Hero Header */}
       <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -33,12 +35,39 @@ export default function Home() {
                 Aprende sobre Inteligencia Artificial de forma divertida
               </p>
             </motion.div>
-            <Link href="/admin">
-              <Button variant="outline" size="sm" data-testid="button-admin">
-                <Settings className="w-4 h-4 mr-2" />
-                Administración
+            <div className="flex items-center gap-2 flex-wrap">
+              {user && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+                  <User className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium" data-testid="text-username">
+                    {user.name || user.username}
+                  </span>
+                  {user.role === "admin" && (
+                    <Badge variant="secondary" data-testid="badge-role">
+                      Admin
+                    </Badge>
+                  )}
+                </div>
+              )}
+              {user?.role === "admin" && (
+                <Link href="/admin">
+                  <Button variant="outline" size="sm" data-testid="button-admin">
+                    <Settings className="w-4 h-4 mr-2" />
+                    Administración
+                  </Button>
+                </Link>
+              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Salir
               </Button>
-            </Link>
+            </div>
           </div>
         </div>
       </header>

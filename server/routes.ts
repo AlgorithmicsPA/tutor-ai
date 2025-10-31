@@ -426,6 +426,163 @@ Responde SOLO con el JSON, sin texto adicional.`;
     }
   });
 
+  // Admin: User Management Endpoints
+  
+  // Get all users (admin only)
+  app.get("/api/admin/users", async (_req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Remove password from response
+      const sanitizedUsers = allUsers.map(({ password, ...user }) => user);
+      res.json(sanitizedUsers);
+    } catch (error: any) {
+      console.error("Failed to fetch users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Create new user (admin only)
+  app.post("/api/admin/users", async (req, res) => {
+    try {
+      const { username, password, name, role } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Usuario y contraseña son obligatorios" });
+      }
+
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "El nombre de usuario ya existe" });
+      }
+
+      // Hash password using same format as auth.ts
+      const { scrypt, randomBytes } = await import("crypto");
+      const { promisify } = await import("util");
+      const scryptAsync = promisify(scrypt);
+      
+      const salt = randomBytes(16).toString("hex");
+      const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+      const hashedPassword = `${buf.toString("hex")}.${salt}`;
+
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+        role: role || "student",
+        name,
+      });
+
+      // Remove password from response
+      const { password: _, ...sanitizedUser } = user;
+      res.status(201).json(sanitizedUser);
+    } catch (error: any) {
+      console.error("Failed to create user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  // Update user (admin only)
+  app.put("/api/admin/users/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { name, role, password } = req.body;
+      
+      const updateData: Partial<InsertUser> = {};
+      if (name !== undefined) updateData.name = name;
+      if (role !== undefined) updateData.role = role;
+      
+      if (password) {
+        // Hash new password if provided using same format as auth.ts
+        const { scrypt, randomBytes } = await import("crypto");
+        const { promisify } = await import("util");
+        const scryptAsync = promisify(scrypt);
+        
+        const salt = randomBytes(16).toString("hex");
+        const buf = (await scryptAsync(password, salt, 64)) as Buffer;
+        updateData.password = `${buf.toString("hex")}.${salt}`;
+      }
+
+      const updatedUser = await storage.updateUser(userId, updateData);
+      
+      if (!updatedUser) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      const { password: _, ...sanitizedUser } = updatedUser;
+      res.json(sanitizedUser);
+    } catch (error: any) {
+      console.error("Failed to update user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Delete user (admin only)
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const deleted = await storage.deleteUser(userId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: "Usuario no encontrado" });
+      }
+
+      res.json({ ok: true });
+    } catch (error: any) {
+      console.error("Failed to delete user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
+  // Admin: Progress Tracking Endpoint
+  app.get("/api/admin/progress", async (_req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      const allLessons = await storage.getAllLessons();
+      const publishedLessons = allLessons.filter(l => l.published);
+      
+      const progressData = [];
+      
+      for (const user of allUsers) {
+        if (user.role !== "student") continue;
+        
+        let completedCount = 0;
+        let totalScore = 0;
+        let quizCount = 0;
+        let lastActivity = null;
+        
+        for (const lesson of publishedLessons) {
+          const progress = await storage.getUserProgress(user.id.toString(), lesson.lessonId);
+          
+          if (progress) {
+            if (progress.completed) completedCount++;
+            if (progress.quizScores && progress.quizScores.length > 0) {
+              const avgScore = progress.quizScores.reduce((sum, s) => sum + s, 0) / progress.quizScores.length;
+              totalScore += avgScore;
+              quizCount++;
+            }
+            if (progress.updatedAt && (!lastActivity || new Date(progress.updatedAt) > new Date(lastActivity))) {
+              lastActivity = progress.updatedAt;
+            }
+          }
+        }
+        
+        progressData.push({
+          userId: user.id,
+          userName: user.name || user.username,
+          username: user.username,
+          lessonsCompleted: completedCount,
+          totalLessons: publishedLessons.length,
+          averageScore: quizCount > 0 ? (totalScore / quizCount) * 100 : 0,
+          lastActivity: lastActivity,
+        });
+      }
+      
+      res.json(progressData);
+    } catch (error: any) {
+      console.error("Failed to fetch progress data:", error);
+      res.status(500).json({ error: "Failed to fetch progress data" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

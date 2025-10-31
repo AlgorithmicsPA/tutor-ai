@@ -13,6 +13,12 @@ declare global {
   }
 }
 
+// Helper function to remove password from user object before sending to client
+function sanitizeUser(user: SelectUser): Omit<SelectUser, "password"> {
+  const { password, ...sanitizedUser } = user;
+  return sanitizedUser;
+}
+
 const scryptAsync = promisify(scrypt);
 
 async function hashPassword(password: string) {
@@ -47,12 +53,25 @@ export function setupAuth(app: Express) {
   passport.use(
     new LocalStrategy(async (username, password, done) => {
       try {
+        console.log(`[Auth] Login attempt for username: ${username}`);
         const user = await storage.getUserByUsername(username);
-        if (!user || !(await comparePasswords(password, user.password))) {
+        
+        if (!user) {
+          console.log(`[Auth] User not found: ${username}`);
           return done(null, false, { message: "Usuario o contraseña incorrectos" });
         }
+        
+        console.log(`[Auth] User found: ${user.username}, checking password...`);
+        const passwordMatch = await comparePasswords(password, user.password);
+        console.log(`[Auth] Password match: ${passwordMatch}`);
+        
+        if (!passwordMatch) {
+          return done(null, false, { message: "Usuario o contraseña incorrectos" });
+        }
+        
         return done(null, user);
       } catch (error) {
+        console.error(`[Auth] Login error:`, error);
         return done(error);
       }
     }),
@@ -90,7 +109,7 @@ export function setupAuth(app: Express) {
 
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(201).json(user);
+        res.status(201).json(sanitizeUser(user));
       });
     } catch (error) {
       next(error);
@@ -105,7 +124,7 @@ export function setupAuth(app: Express) {
       }
       req.login(user, (err) => {
         if (err) return next(err);
-        res.status(200).json(user);
+        res.status(200).json(sanitizeUser(user));
       });
     })(req, res, next);
   });
@@ -113,12 +132,12 @@ export function setupAuth(app: Express) {
   app.post("/api/logout", (req, res, next) => {
     req.logout((err) => {
       if (err) return next(err);
-      res.sendStatus(200);
+      res.status(200).json({ ok: true });
     });
   });
 
   app.get("/api/user", (req, res) => {
     if (!req.isAuthenticated()) return res.sendStatus(401);
-    res.json(req.user);
+    res.json(sanitizeUser(req.user!));
   });
 }

@@ -25,6 +25,9 @@ Lessons are defined using a structured **JSON schema** supporting a variety of i
 ### Automatic Lesson Generation System
 The platform features an **AI-powered lesson generation system** (`POST /api/lessons/generate`) that uses **OpenAI GPT-5** (via Replit AI Integrations) to create full lesson timelines based on metadata inputs (title, age, objectives). It generates tutor messages, quizzes, reflection prompts, and even suggests educational images, which are then mapped to pre-generated assets.
 
+### LLM Orquestador - Conversational Lesson Creator
+A conversational AI assistant (`/admin/orchestrator`) that guides educators through lesson creation via natural dialogue. The orchestrator asks strategic questions to gather requirements (audience, duration, level, type, objectives), automatically extracts parameters from conversation context, and generates complete lessons with all new interactive widgets. Features real-time parameter detection, manual override capability, and seamless integration with the lesson generation system.
+
 ## External Dependencies
 
 ### AI Services

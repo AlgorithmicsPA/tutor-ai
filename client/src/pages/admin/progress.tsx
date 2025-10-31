@@ -42,8 +42,11 @@ export default function ProgressPage() {
   const avgCompletionRate =
     progressData && progressData.length > 0
       ? Math.round(
-          progressData.reduce((sum, p) => sum + (p.lessonsCompleted / p.totalLessons) * 100, 0) /
-            progressData.length
+          progressData.reduce((sum, p) => {
+            // Only include students with lessons in the average
+            const rate = p.totalLessons > 0 ? (p.lessonsCompleted / p.totalLessons) * 100 : 0;
+            return sum + rate;
+          }, 0) / progressData.length
         )
       : 0;
 
@@ -145,9 +148,11 @@ export default function ProgressPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredProgress.map((progress) => {
-                    const completionRate = Math.round(
-                      (progress.lessonsCompleted / progress.totalLessons) * 100
-                    );
+                    // Safely calculate completion rate, default to 0 if no lessons
+                    const completionRate = progress.totalLessons > 0 
+                      ? Math.round((progress.lessonsCompleted / progress.totalLessons) * 100)
+                      : 0;
+                    
                     return (
                       <TableRow key={progress.userId} data-testid={`row-progress-${progress.userId}`}>
                         <TableCell>

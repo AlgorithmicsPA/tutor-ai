@@ -162,7 +162,7 @@ export default function UsersPage() {
       name: user.name || "",
       username: user.username,
       password: "",
-      role: user.role,
+      role: user.role as "admin" | "student",
     });
   };
 

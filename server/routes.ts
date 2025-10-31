@@ -11,7 +11,8 @@ import {
   type TutorResponse,
   type GradeResponse,
   type Lesson,
-  type GenerateLessonResponse
+  type GenerateLessonResponse,
+  type InsertUser
 } from "@shared/schema";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
@@ -554,11 +555,26 @@ Responde SOLO con el JSON, sin texto adicional.`;
           
           if (progress) {
             if (progress.completed) completedCount++;
-            if (progress.quizScores && progress.quizScores.length > 0) {
-              const avgScore = progress.quizScores.reduce((sum, s) => sum + s, 0) / progress.quizScores.length;
-              totalScore += avgScore;
-              quizCount++;
+            
+            // Handle quiz scores - they might be stored as numbers or objects {index, score}
+            if (progress.quizScores && Array.isArray(progress.quizScores) && progress.quizScores.length > 0) {
+              try {
+                const scores = progress.quizScores.map(s => {
+                  // Handle both object format {index, score} and legacy number format
+                  return typeof s === 'object' && s !== null && 'score' in s ? s.score : (typeof s === 'number' ? s : 0);
+                });
+                
+                if (scores.length > 0) {
+                  const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+                  totalScore += avgScore;
+                  quizCount++;
+                }
+              } catch (error) {
+                // Skip malformed quiz scores
+                console.warn(`Malformed quiz scores for user ${user.id}, lesson ${lesson.lessonId}`, error);
+              }
             }
+            
             if (progress.updatedAt && (!lastActivity || new Date(progress.updatedAt) > new Date(lastActivity))) {
               lastActivity = progress.updatedAt;
             }

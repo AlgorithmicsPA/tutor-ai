@@ -10,13 +10,22 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - Preferred communication style: Simple, everyday language
 - Content focus: Teaching about **Artificial Intelligence** (how to use OpenAI and Gemini), not mathematics
 
-## Recent Changes (October 30, 2025)
+## Recent Changes (October 31, 2025)
+
+### Complete Authentication System Implementation
+- **User Authentication**: Passport.js with local strategy (username/password)
+- **Secure Password Hashing**: Scrypt algorithm with per-user salts
+- **Session Management**: PostgreSQL-backed sessions with express-session + connect-pg-simple
+- **Role-Based Access Control**: Two roles (admin/student) with route protection
+- **Security Hardening**: Password hashes sanitized from all API responses (never sent to client)
+- **Protected Routes**: All application routes require authentication; admin routes require admin role
+- **Auth UI**: Material Design login/register page with form validation and error handling
 
 ### Student/Admin Separation Architecture
 - **Student Area (/)**: Home page displays only published lessons with double filtering (backend + frontend) for security
 - **Admin Area (/admin)**: Dashboard with statistics, quick actions, and lesson management
 - **Navigation**: Clear separation maintained - admin buttons always return to /admin context
-- **Security**: Separate endpoints ensure students never see draft content
+- **Security**: Separate endpoints ensure students never see draft content; role-based access enforced
 
 ## System Architecture
 
@@ -39,6 +48,9 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - Accessibility-first component design
 
 **Key Frontend Components:**
+- `AuthPage`: Login/register page with Material Design and form validation
+- `AuthProvider`: Context provider for authentication state management
+- `ProtectedRoute`: Route protection component with role-based access control
 - `LessonRenderer`: Main orchestrator for displaying structured lesson content
 - `ChatInterface`: Real-time AI tutor chat with message history
 - `QuizWidget`: Interactive multiple-choice assessments with server-side grading
@@ -46,9 +58,9 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - `TutorMessage`: Friendly AI tutor message displays with role-based icons and Text-to-Speech
 - `TimelineBuilder`: Visual drag-and-drop editor for lesson content creation
 - `LessonEditorPage`: Complete authoring interface with metadata, content, and live preview tabs
-- `HomePage`: Student-facing lesson browser showing only published lessons
-- `LessonViewPage`: Student-facing lesson player with full interactive experience
-- `AdminDashboard`: Admin panel with statistics and quick actions
+- `HomePage`: Student-facing lesson browser showing only published lessons (authentication required)
+- `LessonViewPage`: Student-facing lesson player with full interactive experience (authentication required)
+- `AdminDashboard`: Admin panel with statistics and quick actions (admin role required)
 
 ### Backend Architecture
 
@@ -57,18 +69,25 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 - **Framework:** Express.js for REST API
 - **Database ORM:** Drizzle ORM configured for PostgreSQL
 - **Database Provider:** Neon serverless PostgreSQL
+- **Authentication:** Passport.js with Local Strategy
+- **Session Management:** express-session with PostgreSQL store (connect-pg-simple)
 - **AI Integration:** Dual provider support (OpenAI + Google Gemini)
-- **Session Management:** In-memory storage with planned PostgreSQL session store (connect-pg-simple)
 
 **API Design:**
 - RESTful endpoints with Zod schema validation
-- `/api/tutor`: AI chat completions with conversation history
-- `/api/grade`: Server-side answer validation and scoring
-- `/api/lessons`: Public endpoint returning ONLY published lessons (for students)
-- `/api/admin/lessons`: Admin endpoint returning ALL lessons (published and drafts)
-- `/api/lessons/:id`: Full CRUD for individual lessons (GET/POST/PUT/DELETE)
-- `/api/progress`: User progress tracking and quiz score persistence
-- `/healthz`: Health check with provider availability status
+- **Authentication**: 
+  - `POST /api/register`: User registration (username, password, name, role)
+  - `POST /api/login`: User authentication
+  - `POST /api/logout`: Session termination
+  - `GET /api/user`: Get current authenticated user
+- **Content**:
+  - `/api/tutor`: AI chat completions with conversation history
+  - `/api/grade`: Server-side answer validation and scoring
+  - `/api/lessons`: Endpoint returning ONLY published lessons (requires authentication)
+  - `/api/admin/lessons`: Admin endpoint returning ALL lessons (requires admin role)
+  - `/api/lessons/:id`: Full CRUD for individual lessons (GET/POST/PUT/DELETE)
+  - `/api/progress`: User progress tracking and quiz score persistence
+- **Health**: `/healthz`: Health check with provider availability status
 
 **AI Provider Strategy:**
 - Primary: OpenAI via Replit AI Integrations (GPT-5 model, no API key required)
@@ -85,16 +104,34 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 
 ### Authentication & Authorization
 
-**Current Implementation:**
-- Memory-based user storage (MemStorage class)
-- User schema defined with Drizzle ORM
-- Placeholder authentication (no active session validation)
-- Designed for future PostgreSQL session persistence
+**Implementation (Production-Ready):**
+- **Backend**: Passport.js with Local Strategy for username/password authentication
+- **Password Security**: Scrypt hashing with per-user salts, never exposed to client
+- **Session Store**: PostgreSQL-backed sessions using connect-pg-simple
+- **User Storage**: PostgreSQL via Drizzle ORM (not in-memory)
+- **Session Cookie**: Secure, HTTP-only session cookies with 7-day expiration
+- **Response Sanitization**: All auth endpoints use `sanitizeUser()` to strip password hashes before sending to client
 
-**Planned Architecture:**
-- PostgreSQL-backed session store using connect-pg-simple
-- Cookie-based session management
-- User roles for students and educators
+**Roles:**
+- **admin**: Full access to all features including lesson management, statistics, and admin dashboard
+- **student**: Access to published lessons only, cannot access admin routes
+
+**Protected Routes:**
+- All application routes require authentication (redirect to /auth if not logged in)
+- `/admin/*` routes require admin role (students see "Access Denied")
+- Public route: `/auth` (login/register page)
+
+**API Endpoints:**
+- `POST /api/register`: Create new account with username, password, name, and role
+- `POST /api/login`: Authenticate with username and password
+- `POST /api/logout`: Destroy session and log out
+- `GET /api/user`: Get current authenticated user (without password hash)
+
+**Frontend Components:**
+- `AuthProvider`: React context providing auth state and mutations (login, logout, register)
+- `useAuth`: Hook for accessing current user and auth functions
+- `ProtectedRoute`: Component for route protection with optional admin requirement
+- `AuthPage`: Login/Register page with Material Design, tabs, and form validation
 
 ### Lesson Content System
 
@@ -180,6 +217,7 @@ Tutor IA is an educational platform designed for children aged 7-9, teaching the
 
 ### Environment Variables
 - `DATABASE_URL`: PostgreSQL connection string (Neon)
+- `SESSION_SECRET`: Secret key for session encryption (auto-generated by Replit)
 - `AI_INTEGRATIONS_OPENAI_API_KEY`: Replit AI integration token (auto-provided)
 - `AI_INTEGRATIONS_OPENAI_BASE_URL`: Replit AI endpoint (auto-provided)
 - `GEMINI_API_KEY`: Optional Google Gemini API key

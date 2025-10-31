@@ -1,4 +1,4 @@
-import type { LessonDSL } from "@shared/schema";
+import type { LessonDSL, TimelineItem } from "@shared/schema";
 import { TutorMessage } from "./TutorMessage";
 import { LessonImage } from "./LessonImage";
 import { QuizWidget } from "./QuizWidget";
@@ -23,7 +23,7 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
   const averageScore = calculateAverageScore();
 
   // Check if an item should be shown based on its condition
-  const shouldShowItem = (item: LessonDSL["timeline"][number]): boolean => {
+  const shouldShowItem = (item: TimelineItem): boolean => {
     if (!("condition" in item) || !item.condition) return true;
     
     const { requireMinScore, requireMaxScore } = item.condition;
@@ -38,6 +38,94 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
     
     return true;
   };
+
+  // Render a timeline item (used for both flat timeline and module timeline)
+  const renderTimelineItem = (item: TimelineItem, index: number, keyPrefix: string = ""): React.ReactNode => {
+    // Check if item should be shown based on conditions
+    if (!shouldShowItem(item)) {
+      return null;
+    }
+
+    const key = `${keyPrefix}${index}`;
+
+    switch (item.type) {
+      case "tutor_say":
+        return (
+          <TutorMessage
+            key={key}
+            messageId={`${lesson.meta.id}-msg-${index}`}
+            text={item.text}
+            role={item.role}
+            enableVoice={item.voice ?? true}
+            autoplay={item.voice === true}
+          />
+        );
+      case "show_image":
+        return (
+          <LessonImage
+            key={key}
+            src={item.src}
+            alt={item.alt}
+          />
+        );
+      case "quiz":
+        return (
+          <QuizWidget
+            key={key}
+            question={item.question}
+            choices={item.choices}
+            answer={item.answer}
+            lessonId={lesson.meta.id}
+            onComplete={(score) => onQuizComplete?.(index, score)}
+          />
+        );
+      case "interactive":
+        if (item.widget === "order-steps") {
+          return (
+            <OrderStepsWidget
+              key={key}
+              data={item.data}
+            />
+          );
+        }
+        return null;
+      case "reflection":
+        return (
+          <ReflectionPrompt
+            key={key}
+            prompt={item.prompt}
+          />
+        );
+      case "adaptive_path":
+        return (
+          <AdaptivePathIndicator
+            key={key}
+            message={item.message}
+            icon={item.icon}
+          />
+        );
+      // TODO: Add new widget types here
+      case "theory_block":
+      case "prompt_editor":
+      case "chat_simulator":
+      case "code_exercise":
+      case "comparison":
+      case "timeline_interactive":
+      case "hotspot_diagram":
+      case "mini_project":
+        // Placeholder for new widgets - will be implemented next
+        return (
+          <div key={key} className="p-4 bg-muted rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              Widget "{item.type}" - Próximamente
+            </p>
+          </div>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="lesson-renderer">
       {/* Lesson Header */}
@@ -52,6 +140,16 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
           <span className="px-3 py-1 rounded-full bg-muted">
             Idioma: {lesson.meta.lang.toUpperCase()}
           </span>
+          {lesson.meta.duration && (
+            <span className="px-3 py-1 rounded-full bg-muted">
+              Duración: {lesson.meta.duration} min
+            </span>
+          )}
+          {lesson.meta.level && (
+            <span className="px-3 py-1 rounded-full bg-muted">
+              Nivel: {lesson.meta.level}
+            </span>
+          )}
         </div>
         {lesson.objectives.length > 0 && (
           <div className="bg-card rounded-xl p-4 border border-card-border">
@@ -70,75 +168,48 @@ export function LessonRenderer({ lesson, onQuizComplete, userQuizScores = [] }: 
         )}
       </div>
 
-      {/* Timeline Items */}
-      <div className="space-y-6">
-        {lesson.timeline.map((item, index) => {
-          // Check if item should be shown based on conditions
-          if (!shouldShowItem(item)) {
-            return null;
-          }
-
-          switch (item.type) {
-            case "tutor_say":
-              return (
-                <TutorMessage
-                  key={index}
-                  messageId={`${lesson.meta.id}-msg-${index}`}
-                  text={item.text}
-                  role={item.role}
-                  enableVoice={item.voice ?? true}
-                  autoplay={item.voice === true}
-                />
-              );
-            case "show_image":
-              return (
-                <LessonImage
-                  key={index}
-                  src={item.src}
-                  alt={item.alt}
-                />
-              );
-            case "quiz":
-              return (
-                <QuizWidget
-                  key={index}
-                  question={item.question}
-                  choices={item.choices}
-                  answer={item.answer}
-                  lessonId={lesson.meta.id}
-                  onComplete={(score) => onQuizComplete?.(index, score)}
-                />
-              );
-            case "interactive":
-              if (item.widget === "order-steps") {
-                return (
-                  <OrderStepsWidget
-                    key={index}
-                    data={item.data}
-                  />
-                );
-              }
-              return null;
-            case "reflection":
-              return (
-                <ReflectionPrompt
-                  key={index}
-                  prompt={item.prompt}
-                />
-              );
-            case "adaptive_path":
-              return (
-                <AdaptivePathIndicator
-                  key={index}
-                  message={item.message}
-                  icon={item.icon}
-                />
-              );
-            default:
-              return null;
-          }
-        })}
-      </div>
+      {/* Render Modules or Timeline */}
+      {lesson.modules && lesson.modules.length > 0 ? (
+        /* Module-based lesson (NEW) */
+        <div className="space-y-8">
+          {lesson.modules.map((module, moduleIndex) => (
+            <div key={module.id} className="space-y-4">
+              {/* Module Header */}
+              <div className="border-l-4 border-primary pl-4 py-2">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-2xl font-bold font-display text-foreground">
+                    Módulo {moduleIndex + 1}: {module.title}
+                  </h2>
+                  <span className="text-sm text-muted-foreground">
+                    {module.estimatedMinutes} min
+                  </span>
+                </div>
+                {module.description && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {module.description}
+                  </p>
+                )}
+              </div>
+              {/* Module Timeline */}
+              <div className="space-y-6 pl-6">
+                {module.timeline.map((item, itemIndex) => 
+                  renderTimelineItem(item, itemIndex, `module-${moduleIndex}-`)
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : lesson.timeline && lesson.timeline.length > 0 ? (
+        /* Flat timeline (LEGACY) */
+        <div className="space-y-6">
+          {lesson.timeline.map((item, index) => renderTimelineItem(item, index))}
+        </div>
+      ) : (
+        /* No content */
+        <div className="text-center text-muted-foreground py-12">
+          No hay contenido disponible para esta lección.
+        </div>
+      )}
     </div>
   );
 }

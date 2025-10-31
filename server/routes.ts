@@ -72,34 +72,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let reply: string;
 
-      if (provider === "gemini" && geminiClient) {
-        // Use Gemini with proper SDK usage
-        const model = geminiClient.getGenerativeModel({ 
-          model: "gemini-2.5-flash" 
-        });
-        
-        const content = [
-          system ? `[SYSTEM]\n${system}\n\n` : "",
-          ...messages.map(m => `[${m.role.toUpperCase()}] ${m.content}`)
-        ].join("\n");
+      // Always use OpenAI for now (Gemini integration to be fixed later)
+      const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
+        ...(system ? [{ role: "system" as const, content: system }] : []),
+        ...messages.map(m => ({ role: m.role as "system" | "user" | "assistant", content: m.content })),
+      ];
 
-        const response = await model.generateContent(content);
-        reply = response.response.text() || "Lo siento, no pude generar una respuesta.";
-      } else {
-        // Use OpenAI (default)
-        const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-          ...(system ? [{ role: "system" as const, content: system }] : []),
-          ...messages.map(m => ({ role: m.role as "system" | "user" | "assistant", content: m.content })),
-        ];
+      const response = await openai.chat.completions.create({
+        model: "gpt-5", // Using gpt-5 released August 7, 2025
+        messages: chatMessages,
+        max_completion_tokens: 8192,
+      });
 
-        const response = await openai.chat.completions.create({
-          model: "gpt-5", // Using gpt-5 released August 7, 2025
-          messages: chatMessages,
-          max_completion_tokens: 8192,
-        });
-
-        reply = response.choices[0]?.message?.content || "Lo siento, no pude generar una respuesta.";
-      }
+      reply = response.choices[0]?.message?.content || "Lo siento, no pude generar una respuesta.";
 
       const responseData: TutorResponse = { reply };
       res.json(responseData);
@@ -272,7 +257,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return '/attached_assets/generated_images/How_AI_works_simple_diagram_62b5bad7.png';
   };
 
-  // Generate lesson content automatically using AI
+  // Generate lesson content automatically using AI - ENHANCED VERSION
   app.post("/api/lessons/generate", async (req, res) => {
     try {
       const parsed = generateLessonRequestSchema.safeParse(req.body);
@@ -284,52 +269,155 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      const { title, age, objectives, lang } = parsed.data;
+      const { 
+        title, 
+        age, 
+        objectives, 
+        lang,
+        audience = "children",
+        duration = 30,
+        level = "beginner",
+        type = "mixed",
+        generateImages = true
+      } = parsed.data;
 
-      // Create a detailed prompt for the AI to generate structured lesson content
-      const prompt = `Eres un experto en educación infantil creando lecciones sobre Inteligencia Artificial para niños de ${age} años.
+      // Calculate number of modules based on duration
+      const moduleCount = Math.max(1, Math.floor(duration / 15)); // 1 module per 15 minutes
+      const minutesPerModule = Math.floor(duration / moduleCount);
 
-Título de la lección: "${title}"
-Objetivos de aprendizaje:
+      // Determine audience description
+      const audienceMap = {
+        children: "niños de 7-9 años",
+        teens: "adolescentes de 13-17 años",
+        adults: "adultos (18+ años)",
+        professional: "profesionales y especialistas"
+      };
+      const audienceDesc = audienceMap[audience] || audienceMap.children;
+
+      // Determine lesson type mix
+      const typeMix = type === "theory" ? "80% teoría, 20% práctica" :
+                      type === "practice" ? "30% teoría, 70% práctica" :
+                      "50% teoría, 50% práctica";
+
+      // Create a comprehensive prompt for generating modular, interactive lessons
+      const prompt = `Eres un experto diseñador de contenido educativo creando una lección sobre Inteligencia Artificial.
+
+METADATOS DE LA LECCIÓN:
+- Título: "${title}"
+- Audiencia: ${audienceDesc}
+- Duración total: ${duration} minutos
+- Nivel: ${level}
+- Tipo: ${type} (${typeMix})
+- Idioma: ${lang}
+
+OBJETIVOS DE APRENDIZAJE:
 ${objectives.map((obj, i) => `${i + 1}. ${obj}`).join('\n')}
 
-Genera una lección interactiva y educativa con los siguientes elementos en JSON:
+ESTRUCTURA REQUERIDA:
+Crea ${moduleCount} módulos de aproximadamente ${minutesPerModule} minutos cada uno. Cada módulo debe tener:
+- Un título descriptivo
+- Una descripción breve
+- Un tipo apropiado (introduction, theory, practice, project, assessment, conclusion)
+- Un timeline con items variados
 
-1. Comienza con 2-3 mensajes del tutor (type: "tutor_say") explicando conceptos básicos de forma amigable y simple
-2. Incluye 2-3 quizzes (type: "quiz") con preguntas de opción múltiple relacionadas al tema (4 opciones cada una)
-3. Agrega 1-2 prompts de reflexión (type: "reflection") para que los niños piensen sobre lo aprendido
-4. Incluye marcadores de imágenes (type: "show_image") donde se necesiten ilustraciones (usa src: "GENERATE_IMAGE: <descripción detallada de la imagen>")
+TIPOS DE ITEMS DISPONIBLES (usa TODOS estos tipos para crear lecciones dinámicas):
 
-Formato JSON esperado:
+1. **theory_block**: Bloques de teoría con contenido rico
+   - Usa para explicaciones conceptuales profundas
+   - Incluye keyPoints (3-5 puntos clave)
+   - Agrega imagePrompt para ilustraciones conceptuales
+
+2. **tutor_say**: Mensajes del tutor (usa moderadamente, prefiere theory_block para contenido extenso)
+   - Mensajes cortos y motivadores
+   - role: "guide" o "coach"
+
+3. **show_image**: Imágenes ilustrativas
+   - Usa imagePrompt: "descripción detallada de la imagen" 
+   - La imagen se generará automáticamente
+
+4. **comparison**: Comparaciones lado a lado (NUEVO)
+   - Perfecto para contrastar conceptos (GPT vs Gemini, antes vs después, etc.)
+   - Incluye leftSide y rightSide con título, content, e imagePrompt
+
+5. **quiz**: Preguntas de opción múltiple
+   - 4 opciones cada una
+   - Incluye explanation (por qué la respuesta es correcta)
+
+6. **prompt_editor**: Editor de prompts interactivo (NUEVO - ideal para práctica)
+   - challenge: qué debe lograr el estudiante
+   - star terPrompt: prompt inicial para modificar
+   - hints: pistas para ayudar
+   - expectedConcepts: palabras clave que debe incluir
+
+7. **chat_simulator**: Simulador de chat con IA (NUEVO - muy interactivo)
+   - scenario: contexto de la simulación
+   - systemPrompt: cómo debe comportarse la IA
+   - expectedTopics: temas que el estudiante debe cubrir
+   - minMessages: número mínimo de mensajes
+
+8. **timeline_interactive**: Línea de tiempo interactiva (NUEVO)
+   - Perfecto para historia de la IA, evolución de modelos
+   - events: array de eventos con fecha, título, descripción
+
+9. **hotspot_diagram**: Diagrama con puntos clicables (NUEVO)
+   - imageSrc o imagePrompt para el diagrama base
+   - hotspots: puntos interactivos con información
+
+10. **mini_project**: Mini proyecto guiado (NUEVO - para práctica profunda)
+    - description: qué van a construir
+    - steps: pasos del proyecto con hints
+    - estimatedTime: minutos estimados
+    - difficulty: beginner/intermediate/advanced
+
+11. **reflection**: Prompts de reflexión
+    - Para que piensen sobre lo aprendido
+
+DISTRIBUCIÓN RECOMENDADA POR MÓDULO:
+- Módulo 1 (Introducción): theory_block, show_image, quiz ligero
+- Módulos intermedios (Teoría): theory_block, comparison, timeline_interactive, quiz
+- Módulos de práctica: prompt_editor, chat_simulator, mini_project
+- Módulo final: mini_project o assessment con quiz final
+
+FORMATO JSON ESPERADO:
 {
-  "timeline": [
-    {"type": "tutor_say", "text": "...", "voice": true, "role": "guide"},
-    {"type": "quiz", "question": "...", "choices": ["opción 1", "opción 2", "opción 3", "opción 4"], "answer": 0},
-    {"type": "show_image", "src": "GENERATE_IMAGE: ilustración colorida de...", "alt": "..."},
-    {"type": "reflection", "prompt": "..."}
+  "modules": [
+    {
+      "id": "module-1",
+      "title": "Introducción a...",
+      "description": "En este módulo...",
+      "estimatedMinutes": ${minutesPerModule},
+      "type": "introduction",
+      "timeline": [
+        {"type": "theory_block", "title": "...", "content": "...", "keyPoints": ["...", "..."], "imagePrompt": "..."},
+        {"type": "comparison", "title": "...", "leftSide": {...}, "rightSide": {...}},
+        {"type": "quiz", "question": "...", "choices": [...], "answer": 0, "explanation": "..."}
+      ]
+    }
   ]
 }
 
 IMPORTANTE:
-- Los mensajes del tutor deben ser cortos, claros y motivadores
-- Las preguntas de quiz deben estar adaptadas a la edad ${age}
-- Usa lenguaje simple y ejemplos concretos
-- Para cada imagen, describe detalladamente lo que debe mostrar (será generada automáticamente)
-- Incluye al menos 8-10 items en total en el timeline
-- Varía el tipo de items para mantener el interés
+- Cada módulo debe tener 4-8 items en su timeline
+- Varía los tipos de items para mantener el interés
+- Para ${audience}, ajusta el lenguaje y complejidad apropiadamente
+- Nivel ${level}: ${level === "beginner" ? "conceptos básicos, ejemplos simples" : level === "intermediate" ? "profundiza conceptos, casos prácticos" : "teoría avanzada, proyectos complejos"}
+- Incluye al menos 1 prompt_editor y 1 chat_simulator para práctica interactiva
+- Los mini_project son ideales para módulos de práctica final
+- USA imagePrompt en lugar de src para que se generen imágenes automáticamente
+- El contenido debe ser educativo, preciso y adaptado a ${audienceDesc}
 
-Responde SOLO con el JSON, sin texto adicional.`;
+Responde SOLO con el JSON de los módulos, sin texto adicional.`;
 
       const response = await openai.chat.completions.create({
         model: "gpt-5",
         messages: [
           { 
             role: "system", 
-            content: "Eres un experto diseñador de contenido educativo para niños. Generas JSON estructurado válido siguiendo exactamente el formato solicitado." 
+            content: "Eres un diseñador experto de contenido educativo interactivo. Generas JSON estructurado válido con lecciones modulares y variadas. Siempre incluyes los nuevos tipos de items interactivos (prompt_editor, chat_simulator, comparison, timeline_interactive, mini_project) para crear experiencias de aprendizaje dinámicas." 
           },
           { role: "user", content: prompt }
         ],
-        max_completion_tokens: 8192,
+        max_completion_tokens: 16384,
         response_format: { type: "json_object" },
       });
 
@@ -340,21 +428,64 @@ Responde SOLO con el JSON, sin texto adicional.`;
 
       const parsedContent: GenerateLessonResponse = JSON.parse(generatedContent);
       
-      // Process timeline to replace GENERATE_IMAGE markers with actual image paths
-      const processedTimeline = parsedContent.timeline.map((item: any) => {
-        if (item.type === "show_image" && item.src?.startsWith("GENERATE_IMAGE:")) {
-          const description = item.src.replace("GENERATE_IMAGE:", "").trim();
-          const imagePath = getEducationalImage(description);
-          
-          return {
-            ...item,
-            src: imagePath,
-          };
-        }
-        return item;
-      });
+      // Process modules to handle image generation
+      if (parsedContent.modules && generateImages) {
+        parsedContent.modules = parsedContent.modules.map(module => ({
+          ...module,
+          timeline: module.timeline.map((item: any) => {
+            // Handle show_image with imagePrompt
+            if (item.type === "show_image" && item.imagePrompt) {
+              return {
+                ...item,
+                src: getEducationalImage(item.imagePrompt),
+              };
+            }
+            // Handle theory_block with imagePrompt
+            if (item.type === "theory_block" && item.imagePrompt) {
+              return {
+                ...item,
+                imageSrc: getEducationalImage(item.imagePrompt),
+              };
+            }
+            // Handle comparison with imagePrompts
+            if (item.type === "comparison") {
+              return {
+                ...item,
+                leftSide: item.leftSide.imagePrompt ? {
+                  ...item.leftSide,
+                  imageSrc: getEducationalImage(item.leftSide.imagePrompt),
+                } : item.leftSide,
+                rightSide: item.rightSide.imagePrompt ? {
+                  ...item.rightSide,
+                  imageSrc: getEducationalImage(item.rightSide.imagePrompt),
+                } : item.rightSide,
+              };
+            }
+            // Handle timeline events with imagePrompts
+            if (item.type === "timeline_interactive" && item.events) {
+              return {
+                ...item,
+                events: item.events.map((event: any) => 
+                  event.imagePrompt ? {
+                    ...event,
+                    imageSrc: getEducationalImage(event.imagePrompt),
+                  } : event
+                ),
+              };
+            }
+            // Handle hotspot_diagram with imagePrompt
+            if (item.type === "hotspot_diagram" && item.imagePrompt) {
+              return {
+                ...item,
+                imageSrc: getEducationalImage(item.imagePrompt),
+              };
+            }
+            return item;
+          }),
+        }));
+      }
       
-      res.json({ timeline: processedTimeline });
+      res.json(parsedContent);
     } catch (error: any) {
       console.error("Failed to generate lesson:", error);
       res.status(500).json({ 

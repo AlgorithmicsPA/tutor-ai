@@ -123,7 +123,7 @@ export default function AdminLessonsPage() {
                       {lesson.lang}
                     </Badge>
                     <Badge variant="outline" data-testid={`badge-items-${lesson.id}`}>
-                      {lesson.timeline.length} items
+                      {lesson.duration ? `${lesson.duration} min` : lesson.modules ? `${lesson.modules.length} módulos` : lesson.timeline ? `${lesson.timeline.length} items` : "Interactiva"}
                     </Badge>
                   </div>
                   <div className="flex gap-2">

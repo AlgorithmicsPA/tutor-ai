@@ -141,7 +141,9 @@ export default function Home() {
                         </Badge>
                         <Badge variant="outline" className="flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {lesson.timeline.length} actividades
+                          {lesson.duration ? `${lesson.duration} min` : 
+                            lesson.modules ? `${lesson.modules.length} módulos` :
+                            lesson.timeline ? `${lesson.timeline.length} actividades` : "Interactiva"}
                         </Badge>
                       </div>
                       <Link href={`/lessons/${lesson.lessonId}`} className="w-full">

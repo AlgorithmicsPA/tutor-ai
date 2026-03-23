@@ -238,7 +238,7 @@ export default function AdminDashboard() {
                             <div>
                               <p className="font-medium">{lesson.title}</p>
                               <p className="text-sm text-muted-foreground">
-                                {lesson.timeline.length} actividades • {lesson.age}
+                                {lesson.duration ? `${lesson.duration} min` : lesson.modules ? `${lesson.modules.length} módulos` : lesson.timeline ? `${lesson.timeline.length} actividades` : "Interactiva"} • {lesson.age}
                               </p>
                             </div>
                           </div>

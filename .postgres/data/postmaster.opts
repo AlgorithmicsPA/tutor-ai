@@ -1,0 +1,1 @@
+/nix/store/bgwr5i8jf8jpg75rr53rz3fqv5k8yrwp-postgresql-16.10/bin/postgres "-D" "/home/runner/workspace/.postgres/data" "-p" "5433" "-k" "/tmp/postgresql" "-c" "listen_addresses="

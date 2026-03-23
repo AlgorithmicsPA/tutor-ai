@@ -1,5 +1,4 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
@@ -47,7 +46,29 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Iniciar base de datos local si DATABASE_URL apunta a un servicio caído
+  try {
+    const { startLocalPostgres, LOCAL_DATABASE_URL } = await import("./postgres-startup");
+    const dbUrl = await startLocalPostgres();
+    process.env.DATABASE_URL = dbUrl;
+    log(`Base de datos local activa`);
+  } catch (err) {
+    log(`[WARN] No se pudo iniciar base de datos local: ${err}`);
+    log(`[WARN] Intentando con DATABASE_URL existente...`);
+  }
+
+  // Importar rutas dinámicamente DESPUÉS de configurar DATABASE_URL
+  const { registerRoutes } = await import("./routes");
   const server = await registerRoutes(app);
+
+  // Crear schema de base de datos si no existe
+  try {
+    const { execSync } = await import("child_process");
+    execSync("npm run db:push 2>&1", { encoding: "utf8" });
+    log("Schema de base de datos sincronizado");
+  } catch (err: any) {
+    log(`[WARN] db:push: ${err.message?.slice(0, 100)}`);
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;

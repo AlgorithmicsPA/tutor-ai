@@ -1,0 +1,23 @@
+2026-03-23 16:45:19.156 UTC [1983] LOG:  starting PostgreSQL 16.10 on x86_64-pc-linux-gnu, compiled by clang version 19.1.7, 64-bit
+2026-03-23 16:45:19.160 UTC [1983] LOG:  listening on IPv6 address "::1", port 5432
+2026-03-23 16:45:19.161 UTC [1983] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2026-03-23 16:45:19.164 UTC [1983] FATAL:  could not create lock file "/run/postgresql/.s.PGSQL.5432.lock": No such file or directory
+2026-03-23 16:45:19.167 UTC [1983] LOG:  database system is shut down
+2026-03-23 16:45:32.830 UTC [2078] LOG:  starting PostgreSQL 16.10 on x86_64-pc-linux-gnu, compiled by clang version 19.1.7, 64-bit
+2026-03-23 16:45:32.834 UTC [2078] LOG:  listening on IPv6 address "::1", port 5433
+2026-03-23 16:45:32.836 UTC [2078] LOG:  listening on IPv4 address "127.0.0.1", port 5433
+2026-03-23 16:45:32.841 UTC [2078] LOG:  listening on Unix socket "/tmp/postgresql/.s.PGSQL.5433"
+2026-03-23 16:45:32.851 UTC [2082] LOG:  database system was shut down at 2026-03-23 16:45:11 UTC
+2026-03-23 16:45:32.869 UTC [2078] LOG:  database system is ready to accept connections
+2026-03-23 16:45:35.999 UTC [2104] FATAL:  database "neondb" does not exist
+2026-03-23 16:46:32.237 UTC [2270] LOG:  starting PostgreSQL 16.10 on x86_64-pc-linux-gnu, compiled by clang version 19.1.7, 64-bit
+2026-03-23 16:46:32.238 UTC [2270] LOG:  listening on IPv4 address "127.0.0.1", port 5433
+2026-03-23 16:46:32.244 UTC [2270] LOG:  listening on Unix socket "/tmp/postgresql/.s.PGSQL.5433"
+2026-03-23 16:46:32.253 UTC [2274] LOG:  database system was interrupted; last known up at 2026-03-23 16:45:32 UTC
+2026-03-23 16:46:32.587 UTC [2274] LOG:  database system was not properly shut down; automatic recovery in progress
+2026-03-23 16:46:32.601 UTC [2274] LOG:  invalid record length at 0/14F1FE0: expected at least 24, got 0
+2026-03-23 16:46:32.601 UTC [2274] LOG:  redo is not required
+2026-03-23 16:46:32.608 UTC [2272] LOG:  checkpoint starting: end-of-recovery immediate wait
+2026-03-23 16:46:32.640 UTC [2272] LOG:  checkpoint complete: wrote 3 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.013 s, total=0.036 s; sync files=2, longest=0.010 s, average=0.007 s; distance=0 kB, estimate=0 kB; lsn=0/14F1FE0, redo lsn=0/14F1FE0
+2026-03-23 16:46:32.647 UTC [2270] LOG:  database system is ready to accept connections
+2026-03-23 16:46:35.099 UTC [2279] FATAL:  role "neondb_owner" does not exist

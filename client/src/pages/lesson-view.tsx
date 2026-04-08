@@ -2,23 +2,31 @@ import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
 import { ArrowLeft, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Lesson, LessonDSL } from "@shared/schema";
+import type { Lesson, LessonDSL, UserProgress } from "@shared/schema";
 import { LessonRenderer } from "@/components/LessonRenderer";
 import { useMemo } from "react";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function LessonViewPage() {
   const [, params] = useRoute("/lessons/:lessonId");
   const lessonId = params?.lessonId;
+  const { user } = useAuth();
 
   const { data: lesson, isLoading } = useQuery<Lesson>({
     queryKey: ["/api/lessons", lessonId],
     enabled: !!lessonId,
   });
 
+  // Fetch user progress for this lesson
+  const { data: progress } = useQuery<UserProgress>({
+    queryKey: ["/api/progress", user?.id?.toString(), lessonId],
+    enabled: !!lessonId && !!user?.id,
+  });
+
   // Convert lesson to DSL format for renderer
   const lessonDSL = useMemo<LessonDSL | null>(() => {
     if (!lesson) return null;
-    
+
     return {
       meta: {
         id: lesson.lessonId,
@@ -92,7 +100,13 @@ export default function LessonViewPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
-          {lessonDSL && <LessonRenderer lesson={lessonDSL} />}
+          {lessonDSL && (
+            <LessonRenderer
+              lesson={lessonDSL}
+              userId={user?.id?.toString()}
+              savedProgress={progress ?? undefined}
+            />
+          )}
         </div>
       </main>
     </div>

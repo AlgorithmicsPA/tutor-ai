@@ -1,15 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import OpenAI from "openai";
-import { GoogleGenAI } from "@google/genai";
-import { 
-  tutorRequestSchema, 
-  gradeRequestSchema,
+import {
   insertLessonSchema,
   insertUserProgressSchema,
   generateLessonRequestSchema,
-  type TutorResponse,
-  type GradeResponse,
   type Lesson,
   type InsertLesson,
   type GenerateLessonResponse,
@@ -18,29 +12,7 @@ import {
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { registerNewsModule } from "./modules/news";
-
-// This is using Replit's AI Integrations service, which provides OpenAI-compatible API access
-// without requiring your own OpenAI API key. Charges are billed to your Replit credits.
-// Reference: javascript_openai_ai_integrations blueprint
-// the newest OpenAI model is "gpt-5" which was released August 7, 2025. do not change this unless explicitly requested by the user
-const openai = new OpenAI({
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-});
-
-// Gemini provider for alternative AI backend
-// DON'T DELETE THIS COMMENT
-// Follow these instructions when using this blueprint:
-// - Note that the newest Gemini model series is "gemini-2.5-flash" or gemini-2.5-pro"
-//   - do not change this unless explicitly requested by the user
-const geminiClient = process.env.GEMINI_API_KEY 
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  : null;
-
-// Scoring helper function
-function scoreQuiz(answerIdx: number, userIdx: number): number {
-  return answerIdx === userIdx ? 1 : 0;
-}
+import { registerTutorModule, openai } from "./modules/tutor";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes: /api/register, /api/login, /api/logout, /api/user
@@ -50,138 +22,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // AI Weekly News routes (módulo aislado, ver server/modules/news/README.md)
   registerNewsModule(app);
 
+  // AI Tutor chat + Quiz grading (módulo aislado, ver server/modules/tutor/README.md)
+  registerTutorModule(app);
+
   // Health check endpoint
   app.get("/healthz", (_req, res) => {
-    res.json({ 
-      ok: true, 
+    res.json({
+      ok: true,
       providers: {
         openai: !!process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
         gemini: !!process.env.GEMINI_API_KEY,
       }
     });
-  });
-
-  // AI Tutor chat endpoint
-  app.post("/api/tutor", async (req, res) => {
-    try {
-      const parsed = tutorRequestSchema.safeParse(req.body);
-      
-      if (!parsed.success) {
-        return res.status(400).json({ 
-          error: "Invalid request", 
-          details: parsed.error.format() 
-        });
-      }
-
-      const { messages, provider = "openai", system } = parsed.data;
-
-      let reply: string;
-      let usedProvider = "openai";
-
-      const chatMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
-        ...(system ? [{ role: "system" as const, content: system }] : []),
-        ...messages.map(m => ({ role: m.role as "system" | "user" | "assistant", content: m.content })),
-      ];
-
-      try {
-        // Try OpenAI first
-        const response = await openai.chat.completions.create({
-          model: "gpt-5", // Using gpt-5 released August 7, 2025
-          messages: chatMessages,
-          max_completion_tokens: 8192,
-        });
-
-        reply = response.choices[0]?.message?.content || "Lo siento, no pude generar una respuesta.";
-      } catch (openaiError: any) {
-        console.log("OpenAI error, attempting Gemini fallback:", openaiError.code || openaiError.message);
-        
-        // If content filter or any OpenAI error, fallback to Gemini
-        if (geminiClient) {
-          try {
-            const geminiModel = geminiClient.getGenerativeModel({ model: "gemini-2.5-flash" });
-            
-            const geminiMessages = chatMessages
-              .filter(m => m.role !== "system")
-              .map(m => ({
-                role: m.role === "assistant" ? "model" : "user",
-                parts: [{ text: m.content }]
-              }));
-
-            const systemInstruction = chatMessages.find(m => m.role === "system")?.content;
-
-            const geminiResponse = await geminiModel.generateContent({
-              contents: geminiMessages,
-              systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
-              generationConfig: {
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-              }
-            });
-
-            reply = geminiResponse.response.text();
-            usedProvider = "gemini";
-            console.log("Successfully used Gemini fallback");
-          } catch (geminiError: any) {
-            console.error("Gemini fallback also failed:", geminiError);
-            // Both failed - return a friendly default message instead of throwing
-            const isContentFilter = openaiError.code === "content_filter" || openaiError.message?.includes("content") || openaiError.message?.includes("filter");
-            reply = isContentFilter 
-              ? "Perfecto, entiendo. ¿Podrías darme más detalles sobre el proyecto?"
-              : "¡Claro! Cuéntame más sobre lo que necesitas.";
-            usedProvider = "fallback";
-          }
-        } else {
-          // No Gemini available - use friendly fallback
-          const isContentFilter = openaiError.code === "content_filter" || openaiError.message?.includes("content") || openaiError.message?.includes("filter");
-          reply = isContentFilter 
-            ? "Entendido. ¿Puedes contarme más sobre el público objetivo?"
-            : "¡Perfecto! ¿Qué más información puedes compartir?";
-          usedProvider = "fallback";
-          console.log("Using fallback message, no Gemini API key available");
-        }
-      }
-
-      const responseData: TutorResponse = { reply };
-      res.json(responseData);
-
-    } catch (error: any) {
-      console.error("Tutor API unexpected error:", error);
-      // Last resort - return a valid response instead of 500
-      res.json({ 
-        reply: "Lo siento, tuve un problema técnico. ¿Podrías repetir tu última respuesta?"
-      });
-    }
-  });
-
-  // Quiz grading endpoint
-  app.post("/api/grade", (req, res) => {
-    try {
-      const parsed = gradeRequestSchema.safeParse(req.body);
-      
-      if (!parsed.success) {
-        return res.status(400).json({ 
-          error: "Invalid request", 
-          details: parsed.error.format() 
-        });
-      }
-
-      const { itemType, answerIndex, userIndex } = parsed.data;
-      
-      let score = 0;
-      if (itemType === "quiz") {
-        score = scoreQuiz(answerIndex, userIndex);
-      }
-
-      const responseData: GradeResponse = { score };
-      res.json(responseData);
-
-    } catch (error: any) {
-      console.error("Grade API error:", error);
-      res.status(500).json({ 
-        error: "Failed to grade response",
-        message: error.message 
-      });
-    }
   });
 
   // Lesson CRUD endpoints

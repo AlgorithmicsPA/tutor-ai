@@ -48,7 +48,7 @@ app.use((req, res, next) => {
 (async () => {
   // Iniciar base de datos local si DATABASE_URL apunta a un servicio caído
   try {
-    const { startLocalPostgres, LOCAL_DATABASE_URL } = await import("./postgres-startup");
+    const { startLocalPostgres, LOCAL_DATABASE_URL } = await import("./core/postgres-startup");
     const dbUrl = await startLocalPostgres();
     process.env.DATABASE_URL = dbUrl;
     log(`Base de datos local activa`);

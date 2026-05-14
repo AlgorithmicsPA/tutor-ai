@@ -34,8 +34,22 @@ function wait(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function hasPgBinaries(): boolean {
+  const which = run("which postgres initdb");
+  return which.includes("postgres") && which.includes("initdb");
+}
+
 export async function startLocalPostgres(): Promise<string> {
   console.log("[postgres] Verificando base de datos local...");
+
+  // Si DATABASE_URL ya está seteado y no hay binario postgres → usar el del sistema
+  if (!hasPgBinaries()) {
+    if (process.env.DATABASE_URL) {
+      console.log("[postgres] Binario postgres no disponible, uso DATABASE_URL del entorno");
+      return process.env.DATABASE_URL;
+    }
+    throw new Error("[postgres] No hay binario postgres ni DATABASE_URL configurado");
+  }
 
   // Crear directorios necesarios
   mkdirSync(path.join(process.cwd(), ".postgres"), { recursive: true });
@@ -72,6 +86,10 @@ export async function startLocalPostgres(): Promise<string> {
 
   pg.stdout?.on("data", (d) => process.stdout.write(`[postgres] ${d}`));
   pg.stderr?.on("data", (d) => process.stderr.write(`[postgres] ${d}`));
+
+  pg.on("error", (err) => {
+    console.error(`[postgres] spawn error: ${err.message}`);
+  });
 
   pg.on("exit", (code) => {
     if (code !== 0) console.error(`[postgres] Proceso terminó con código ${code}`);

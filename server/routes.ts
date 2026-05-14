@@ -17,6 +17,7 @@ import {
 } from "@shared/schema";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
+import { registerNewsModule } from "./modules/news";
 
 // This is using Replit's AI Integrations service, which provides OpenAI-compatible API access
 // without requiring your own OpenAI API key. Charges are billed to your Replit credits.
@@ -45,7 +46,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes: /api/register, /api/login, /api/logout, /api/user
   // Reference: blueprint:javascript_auth_all_persistance
   setupAuth(app);
-  
+
+  // AI Weekly News routes (módulo aislado, ver server/modules/news/README.md)
+  registerNewsModule(app);
+
   // Health check endpoint
   app.get("/healthz", (_req, res) => {
     res.json({ 

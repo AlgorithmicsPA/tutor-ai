@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { type InsertUser } from "@shared/schema";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { registerNewsModule } from "./modules/news";
 import { registerTutorModule } from "./modules/tutor";
 import { registerLessonsModule } from "./modules/lessons";
 import { registerProgressModule } from "./modules/progress";
+import { registerAdminUsersModule } from "./modules/admin_users";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes: /api/register, /api/login, /api/logout, /api/user
@@ -25,6 +25,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // User Progress tracking (módulo aislado, ver server/modules/progress/README.md)
   registerProgressModule(app);
 
+  // Admin: user CRUD (módulo aislado, ver server/modules/admin_users/README.md)
+  registerAdminUsersModule(app);
+
   // Health check endpoint
   app.get("/healthz", (_req, res) => {
     res.json({
@@ -38,112 +41,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Lesson CRUD endpoints — MOVED to server/modules/lessons/ (Fase 3, 2026-05-14)
   // User Progress endpoints — MOVED to server/modules/progress/ (Fase 4, 2026-05-14)
-
-  // Admin: User Management Endpoints
-  
-  // Get all users (admin only)
-  app.get("/api/admin/users", async (_req, res) => {
-    try {
-      const allUsers = await storage.getAllUsers();
-      // Remove password from response
-      const sanitizedUsers = allUsers.map(({ password, ...user }) => user);
-      res.json(sanitizedUsers);
-    } catch (error: any) {
-      console.error("Failed to fetch users:", error);
-      res.status(500).json({ error: "Failed to fetch users" });
-    }
-  });
-
-  // Create new user (admin only)
-  app.post("/api/admin/users", async (req, res) => {
-    try {
-      const { username, password, name, role } = req.body;
-      
-      if (!username || !password) {
-        return res.status(400).json({ error: "Usuario y contraseña son obligatorios" });
-      }
-
-      const existingUser = await storage.getUserByUsername(username);
-      if (existingUser) {
-        return res.status(400).json({ error: "El nombre de usuario ya existe" });
-      }
-
-      // Hash password using same format as auth.ts
-      const { scrypt, randomBytes } = await import("crypto");
-      const { promisify } = await import("util");
-      const scryptAsync = promisify(scrypt);
-      
-      const salt = randomBytes(16).toString("hex");
-      const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-      const hashedPassword = `${buf.toString("hex")}.${salt}`;
-
-      const user = await storage.createUser({
-        username,
-        password: hashedPassword,
-        role: role || "student",
-        name,
-      });
-
-      // Remove password from response
-      const { password: _, ...sanitizedUser } = user;
-      res.status(201).json(sanitizedUser);
-    } catch (error: any) {
-      console.error("Failed to create user:", error);
-      res.status(500).json({ error: "Failed to create user" });
-    }
-  });
-
-  // Update user (admin only)
-  app.put("/api/admin/users/:id", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const { name, role, password } = req.body;
-      
-      const updateData: Partial<InsertUser> = {};
-      if (name !== undefined) updateData.name = name;
-      if (role !== undefined) updateData.role = role;
-      
-      if (password) {
-        // Hash new password if provided using same format as auth.ts
-        const { scrypt, randomBytes } = await import("crypto");
-        const { promisify } = await import("util");
-        const scryptAsync = promisify(scrypt);
-        
-        const salt = randomBytes(16).toString("hex");
-        const buf = (await scryptAsync(password, salt, 64)) as Buffer;
-        updateData.password = `${buf.toString("hex")}.${salt}`;
-      }
-
-      const updatedUser = await storage.updateUser(userId, updateData);
-      
-      if (!updatedUser) {
-        return res.status(404).json({ error: "Usuario no encontrado" });
-      }
-
-      const { password: _, ...sanitizedUser } = updatedUser;
-      res.json(sanitizedUser);
-    } catch (error: any) {
-      console.error("Failed to update user:", error);
-      res.status(500).json({ error: "Failed to update user" });
-    }
-  });
-
-  // Delete user (admin only)
-  app.delete("/api/admin/users/:id", async (req, res) => {
-    try {
-      const userId = parseInt(req.params.id);
-      const deleted = await storage.deleteUser(userId);
-      
-      if (!deleted) {
-        return res.status(404).json({ error: "Usuario no encontrado" });
-      }
-
-      res.json({ ok: true });
-    } catch (error: any) {
-      console.error("Failed to delete user:", error);
-      res.status(500).json({ error: "Failed to delete user" });
-    }
-  });
+  // Admin User Management — MOVED to server/modules/admin_users/ (Fase 5, 2026-05-14)
 
   // Admin: Progress Tracking Endpoint
   app.get("/api/admin/progress", async (_req, res) => {

@@ -1,14 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import {
-  insertUserProgressSchema,
-  type InsertUser
-} from "@shared/schema";
+import { type InsertUser } from "@shared/schema";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { registerNewsModule } from "./modules/news";
 import { registerTutorModule } from "./modules/tutor";
 import { registerLessonsModule } from "./modules/lessons";
+import { registerProgressModule } from "./modules/progress";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication routes: /api/register, /api/login, /api/logout, /api/user
@@ -24,6 +22,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Lessons CRUD + generación con IA (módulo aislado, ver server/modules/lessons/README.md)
   registerLessonsModule(app);
 
+  // User Progress tracking (módulo aislado, ver server/modules/progress/README.md)
+  registerProgressModule(app);
+
   // Health check endpoint
   app.get("/healthz", (_req, res) => {
     res.json({
@@ -36,69 +37,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Lesson CRUD endpoints — MOVED to server/modules/lessons/ (Fase 3, 2026-05-14)
-
-  // User Progress endpoints
-  
-  // Get user progress for a specific lesson
-  app.get("/api/progress/:userId/:lessonId", async (req, res) => {
-    try {
-      const { userId, lessonId } = req.params;
-      const progress = await storage.getUserProgress(userId, lessonId);
-      
-      if (!progress) {
-        // Return empty progress if not found
-        return res.json({
-          userId,
-          lessonId,
-          quizScores: [],
-          completedItems: [],
-          lastPosition: 0,
-          completed: false,
-        });
-      }
-      
-      res.json(progress);
-    } catch (error: any) {
-      console.error("Failed to fetch progress:", error);
-      res.status(500).json({ error: "Failed to fetch progress" });
-    }
-  });
-
-  // Create or update user progress (upsert)
-  app.post("/api/progress", async (req, res) => {
-    try {
-      const parsed = insertUserProgressSchema.safeParse(req.body);
-      
-      if (!parsed.success) {
-        return res.status(400).json({ 
-          error: "Invalid progress data", 
-          details: parsed.error.format() 
-        });
-      }
-
-      const { userId, lessonId, ...progressData } = parsed.data;
-      
-      // Check if progress already exists
-      const existing = await storage.getUserProgress(userId, lessonId);
-      
-      if (existing) {
-        // Update existing progress with full data
-        const updated = await storage.updateUserProgress(existing.id, {
-          userId,
-          lessonId,
-          ...progressData,
-        });
-        return res.json(updated);
-      } else {
-        // Create new progress
-        const created = await storage.createUserProgress(parsed.data);
-        return res.status(201).json(created);
-      }
-    } catch (error: any) {
-      console.error("Failed to save progress:", error);
-      res.status(500).json({ error: "Failed to save progress" });
-    }
-  });
+  // User Progress endpoints — MOVED to server/modules/progress/ (Fase 4, 2026-05-14)
 
   // Admin: User Management Endpoints
   

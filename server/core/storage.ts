@@ -1,52 +1,49 @@
-import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, and, desc, sql } from "drizzle-orm";
+/**
+ * Facade del storage layer — compone la clase `DbStorage` que implementa
+ * `IStorage` delegando cada método al storage de su módulo.
+ *
+ * Fase 9.5 (2026-05-14): el storage monolítico se repartió por feature:
+ *  - `modules/admin_users/storage.ts` — users CRUD
+ *  - `modules/lessons/storage.ts`     — lessons CRUD
+ *  - `modules/progress/storage.ts`    — user progress CRUD
+ *  - `modules/news/storage.ts`        — interests, weekly news, news classes, feedback
+ *
+ * Este archivo queda como **composition root + retro-compat**:
+ *  - Mantiene la interfaz `IStorage` (contrato público histórico).
+ *  - Exporta `storage` (instancia de `DbStorage`) que los 9 call-sites legacy usan
+ *    vía `server/storage.ts` (shim).
+ *  - Las nuevas features deben importar directo del storage de su módulo —
+ *    no agregar métodos acá.
+ *
+ * El `sessionStore` (express-session) sigue acá porque es singleton compartido
+ * por toda la app (auth) y vive ligado al `Pool` global de `core/db.ts`.
+ *
+ * Cuando todos los call-sites migren a `modules/<X>/storage.ts`, esta clase y
+ * la interface `IStorage` se borran y queda solo el `sessionStore` exportado.
+ */
 import session from "express-session";
-import connectPg from "connect-pg-simple";
-import {
-  type Lesson,
-  type InsertLesson,
-  type UserProgress,
-  type InsertUserProgress,
-  type User,
-  type InsertUser,
-  type UserInterest,
-  type InsertUserInterest,
-  type UserCustomInterest,
-  type WeeklyNews,
-  type InsertWeeklyNews,
-  type NewsClass,
-  type NewsClassContent,
-  type NewsFeedback,
-  type InsertNewsFeedback,
-  lessons,
-  userProgress,
-  users,
-  userInterests,
-  userCustomInterests,
-  weeklyNews,
-  newsClasses,
-  newsFeedback,
+import type {
+  Lesson,
+  InsertLesson,
+  UserProgress,
+  InsertUserProgress,
+  User,
+  InsertUser,
+  UserInterest,
+  UserCustomInterest,
+  WeeklyNews,
+  InsertWeeklyNews,
+  NewsClass,
+  NewsClassContent,
+  NewsFeedback,
+  InsertNewsFeedback,
 } from "@shared/schema";
 
-let _pool: Pool | null = null;
-let _db: ReturnType<typeof drizzle> | null = null;
-
-function getPool(): Pool {
-  if (!_pool) {
-    _pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  }
-  return _pool;
-}
-
-function getDb() {
-  if (!_db) {
-    _db = drizzle(getPool());
-  }
-  return _db;
-}
-
-const PostgresSessionStore = connectPg(session);
+import { getPool, PostgresSessionStore } from "./db";
+import * as usersStore from "../modules/admin_users/storage";
+import * as lessonsStore from "../modules/lessons/storage";
+import * as progressStore from "../modules/progress/storage";
+import * as newsStore from "../modules/news/storage";
 
 export interface IStorage {
   // Lesson CRUD
@@ -57,7 +54,7 @@ export interface IStorage {
   createLesson(lesson: InsertLesson): Promise<Lesson>;
   updateLesson(id: number, lesson: Partial<InsertLesson>): Promise<Lesson | undefined>;
   deleteLesson(id: number): Promise<boolean>;
-  
+
   // User Progress CRUD
   getUserProgress(userId: string, lessonId: string): Promise<UserProgress | undefined>;
   createUserProgress(progress: InsertUserProgress): Promise<UserProgress>;
@@ -104,185 +101,40 @@ export class DbStorage implements IStorage {
     });
   }
 
-  // User methods
-  async getAllUsers(): Promise<User[]> {
-    return await getDb().select().from(users);
-  }
+  // ===== Users (delegan a modules/admin_users/storage) =====
+  getAllUsers = usersStore.getAllUsers;
+  getUser = usersStore.getUser;
+  getUserByUsername = usersStore.getUserByUsername;
+  createUser = usersStore.createUser;
+  updateUser = usersStore.updateUser;
+  deleteUser = usersStore.deleteUser;
 
-  async getUser(id: number): Promise<User | undefined> {
-    const result = await getDb().select().from(users).where(eq(users.id, id));
-    return result[0];
-  }
+  // ===== Lessons (delegan a modules/lessons/storage) =====
+  getAllLessons = lessonsStore.getAllLessons;
+  getPublishedLessons = lessonsStore.getPublishedLessons;
+  getLessonById = lessonsStore.getLessonById;
+  getLessonByLessonId = lessonsStore.getLessonByLessonId;
+  createLesson = lessonsStore.createLesson;
+  updateLesson = lessonsStore.updateLesson;
+  deleteLesson = lessonsStore.deleteLesson;
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const result = await getDb()
-      .select()
-      .from(users)
-      .where(sql`LOWER(${users.username}) = LOWER(${username})`);
-    return result[0];
-  }
+  // ===== Progress (delegan a modules/progress/storage) =====
+  getUserProgress = progressStore.getUserProgress;
+  createUserProgress = progressStore.createUserProgress;
+  updateUserProgress = progressStore.updateUserProgress;
 
-  async createUser(user: InsertUser): Promise<User> {
-    const result = await getDb().insert(users).values(user).returning();
-    return result[0];
-  }
-
-  async updateUser(id: number, user: Partial<InsertUser>): Promise<User | undefined> {
-    const result = await getDb()
-      .update(users)
-      .set(user)
-      .where(eq(users.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async deleteUser(id: number): Promise<boolean> {
-    const result = await getDb().delete(users).where(eq(users.id, id)).returning();
-    return result.length > 0;
-  }
-
-  // Lesson methods
-  async getAllLessons(): Promise<Lesson[]> {
-    return await getDb().select().from(lessons);
-  }
-
-  async getPublishedLessons(): Promise<Lesson[]> {
-    return await getDb().select().from(lessons).where(eq(lessons.published, true));
-  }
-
-  async getLessonById(id: number): Promise<Lesson | undefined> {
-    const result = await getDb().select().from(lessons).where(eq(lessons.id, id));
-    return result[0];
-  }
-
-  async getLessonByLessonId(lessonId: string): Promise<Lesson | undefined> {
-    const result = await getDb().select().from(lessons).where(eq(lessons.lessonId, lessonId));
-    return result[0];
-  }
-
-  async createLesson(lesson: InsertLesson): Promise<Lesson> {
-    const result = await getDb().insert(lessons).values(lesson).returning();
-    return result[0];
-  }
-
-  async updateLesson(id: number, lesson: Partial<InsertLesson>): Promise<Lesson | undefined> {
-    const result = await getDb()
-      .update(lessons)
-      .set({ ...lesson, updatedAt: new Date() })
-      .where(eq(lessons.id, id))
-      .returning();
-    return result[0];
-  }
-
-  async deleteLesson(id: number): Promise<boolean> {
-    const result = await getDb().delete(lessons).where(eq(lessons.id, id)).returning();
-    return result.length > 0;
-  }
-
-  // User Progress methods
-  async getUserProgress(userId: string, lessonId: string): Promise<UserProgress | undefined> {
-    const result = await getDb()
-      .select()
-      .from(userProgress)
-      .where(and(eq(userProgress.userId, userId), eq(userProgress.lessonId, lessonId)));
-    return result[0];
-  }
-
-  async createUserProgress(progress: InsertUserProgress): Promise<UserProgress> {
-    const result = await getDb().insert(userProgress).values(progress).returning();
-    return result[0];
-  }
-
-  async updateUserProgress(
-    id: number,
-    progress: Partial<InsertUserProgress>
-  ): Promise<UserProgress | undefined> {
-    const result = await getDb()
-      .update(userProgress)
-      .set({ ...progress, updatedAt: new Date() })
-      .where(eq(userProgress.id, id))
-      .returning();
-    return result[0];
-  }
-
-  // ===== News: user interests =====
-  async getUserInterests(userId: number): Promise<UserInterest[]> {
-    return await getDb().select().from(userInterests).where(eq(userInterests.userId, userId));
-  }
-
-  async setUserInterests(userId: number, topics: string[]): Promise<UserInterest[]> {
-    // Reemplaza completamente el set de intereses
-    await getDb().delete(userInterests).where(eq(userInterests.userId, userId));
-    if (topics.length === 0) return [];
-    const rows = topics.map(topic => ({ userId, topic, score: 0 }));
-    return await getDb().insert(userInterests).values(rows).returning();
-  }
-
-  async getUserCustomInterests(userId: number): Promise<UserCustomInterest[]> {
-    return await getDb().select().from(userCustomInterests).where(eq(userCustomInterests.userId, userId));
-  }
-
-  async setUserCustomInterests(userId: number, texts: string[]): Promise<UserCustomInterest[]> {
-    await getDb().delete(userCustomInterests).where(eq(userCustomInterests.userId, userId));
-    const clean = texts.map(t => t.trim()).filter(t => t.length > 0 && t.length <= 200);
-    if (clean.length === 0) return [];
-    const rows = clean.slice(0, 10).map(text => ({ userId, text }));
-    return await getDb().insert(userCustomInterests).values(rows).returning();
-  }
-
-  async bumpUserInterestScore(userId: number, topic: string, delta: number): Promise<void> {
-    const existing = await getDb()
-      .select()
-      .from(userInterests)
-      .where(and(eq(userInterests.userId, userId), eq(userInterests.topic, topic)));
-    if (existing[0]) {
-      await getDb()
-        .update(userInterests)
-        .set({ score: existing[0].score + delta, updatedAt: new Date() })
-        .where(eq(userInterests.id, existing[0].id));
-    } else {
-      await getDb().insert(userInterests).values({ userId, topic, score: delta });
-    }
-  }
-
-  // ===== News: weekly raw news =====
-  async getWeeklyNewsByWeek(weekOf: string): Promise<WeeklyNews[]> {
-    return await getDb()
-      .select()
-      .from(weeklyNews)
-      .where(eq(weeklyNews.weekOf, weekOf))
-      .orderBy(desc(weeklyNews.publishedAt));
-  }
-
-  async createWeeklyNews(news: InsertWeeklyNews): Promise<WeeklyNews> {
-    const result = await getDb().insert(weeklyNews).values(news).returning();
-    return result[0];
-  }
-
-  async getWeeklyNewsById(id: number): Promise<WeeklyNews | undefined> {
-    const result = await getDb().select().from(weeklyNews).where(eq(weeklyNews.id, id));
-    return result[0];
-  }
-
-  // ===== News: clase semanal por user =====
-  async getNewsClass(userId: number, weekOf: string): Promise<NewsClass | undefined> {
-    const result = await getDb()
-      .select()
-      .from(newsClasses)
-      .where(and(eq(newsClasses.userId, userId), eq(newsClasses.weekOf, weekOf)));
-    return result[0];
-  }
-
-  async createNewsClass(userId: number, weekOf: string, content: NewsClassContent): Promise<NewsClass> {
-    const result = await getDb().insert(newsClasses).values({ userId, weekOf, content }).returning();
-    return result[0];
-  }
-
-  // ===== News: feedback =====
-  async createNewsFeedback(feedback: InsertNewsFeedback): Promise<NewsFeedback> {
-    const result = await getDb().insert(newsFeedback).values(feedback).returning();
-    return result[0];
-  }
+  // ===== News (delegan a modules/news/storage) =====
+  getUserInterests = newsStore.getUserInterests;
+  setUserInterests = newsStore.setUserInterests;
+  getUserCustomInterests = newsStore.getUserCustomInterests;
+  setUserCustomInterests = newsStore.setUserCustomInterests;
+  bumpUserInterestScore = newsStore.bumpUserInterestScore;
+  getWeeklyNewsByWeek = newsStore.getWeeklyNewsByWeek;
+  createWeeklyNews = newsStore.createWeeklyNews;
+  getWeeklyNewsById = newsStore.getWeeklyNewsById;
+  getNewsClass = newsStore.getNewsClass;
+  createNewsClass = newsStore.createNewsClass;
+  createNewsFeedback = newsStore.createNewsFeedback;
 }
 
 export const storage = new DbStorage();

@@ -85,7 +85,7 @@ export function registerAuthRoutes(app: Express): void {
 
   app.post("/api/register", async (req, res, next) => {
     try {
-      const { username, password, role, name } = req.body;
+      const { username, password, name } = req.body;
 
       if (!username || !password) {
         return res
@@ -98,10 +98,13 @@ export function registerAuthRoutes(app: Express): void {
         return res.status(400).send("El nombre de usuario ya existe");
       }
 
+      // Hardening privilege-escalation: el registro público NUNCA acepta `role`
+      // del body. Todo signup es "student". La creación de admins se hace por
+      // /api/admin/users (que ahora exige requireAuth + requireAdmin).
       const user = await createUser({
         username,
         password: await hashPassword(password),
-        role: role || "student",
+        role: "student",
         name,
       });
 

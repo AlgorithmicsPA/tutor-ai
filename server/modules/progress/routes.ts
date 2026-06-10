@@ -9,6 +9,7 @@
  */
 import type { Express } from "express";
 import { insertUserProgressSchema } from "@shared/schema";
+import { requireAuth } from "../../core/auth-middleware";
 import {
   getUserProgress,
   createUserProgress,
@@ -17,9 +18,18 @@ import {
 
 export function registerProgressRoutes(app: Express): void {
   // Get user progress for a specific lesson
-  app.get("/api/progress/:userId/:lessonId", async (req, res) => {
+  app.get("/api/progress/:userId/:lessonId", requireAuth, async (req, res) => {
     try {
       const { userId, lessonId } = req.params;
+
+      // IDOR guard: solo el dueño (o un admin) puede leer este progreso.
+      // El frontend pasa siempre `user.id.toString()` (ver lesson-view.tsx),
+      // así que para el flujo legítimo esto no cambia nada.
+      const authUser = req.user as { id: number; role?: string };
+      if (authUser.role !== "admin" && String(authUser.id) !== String(userId)) {
+        return res.status(403).json({ error: "Acceso denegado" });
+      }
+
       const progress = await getUserProgress(userId, lessonId);
 
       if (!progress) {
@@ -42,7 +52,7 @@ export function registerProgressRoutes(app: Express): void {
   });
 
   // Create or update user progress (upsert)
-  app.post("/api/progress", async (req, res) => {
+  app.post("/api/progress", requireAuth, async (req, res) => {
     try {
       const parsed = insertUserProgressSchema.safeParse(req.body);
 
@@ -53,7 +63,16 @@ export function registerProgressRoutes(app: Express): void {
         });
       }
 
-      const { userId, lessonId, ...progressData } = parsed.data;
+      // IDOR guard: el progreso se atribuye SIEMPRE al usuario autenticado.
+      // Un usuario normal no puede falsificar el progreso de otro vía `userId`
+      // del body. El frontend ya manda su propio id (ver LessonRenderer.tsx),
+      // así que esto es transparente para el flujo legítimo. Un admin puede
+      // seguir apuntando a cualquier `userId`.
+      const authUser = req.user as { id: number; role?: string };
+      const ownUserId = String(authUser.id);
+      const { userId: bodyUserId, lessonId, ...progressData } = parsed.data;
+      const userId =
+        authUser.role === "admin" ? bodyUserId : ownUserId;
 
       // Check if progress already exists
       const existing = await getUserProgress(userId, lessonId);
@@ -67,8 +86,12 @@ export function registerProgressRoutes(app: Express): void {
         });
         return res.json(updated);
       } else {
-        // Create new progress
-        const created = await createUserProgress(parsed.data);
+        // Create new progress (con el userId resuelto, no el del body crudo)
+        const created = await createUserProgress({
+          userId,
+          lessonId,
+          ...progressData,
+        });
         return res.status(201).json(created);
       }
     } catch (error: any) {

@@ -14,11 +14,12 @@ import {
   type TutorResponse,
   type GradeResponse,
 } from "@shared/schema";
+import { requireAuth } from "../../core/auth-middleware";
 import { runTutorChat, scoreQuiz } from "./service";
 
 export function registerTutorRoutes(app: Express): void {
   // AI Tutor chat endpoint
-  app.post("/api/tutor", async (req, res) => {
+  app.post("/api/tutor", requireAuth, async (req, res) => {
     try {
       const parsed = tutorRequestSchema.safeParse(req.body);
 
@@ -44,7 +45,7 @@ export function registerTutorRoutes(app: Express): void {
   });
 
   // Quiz grading endpoint
-  app.post("/api/grade", (req, res) => {
+  app.post("/api/grade", requireAuth, (req, res) => {
     try {
       const parsed = gradeRequestSchema.safeParse(req.body);
 

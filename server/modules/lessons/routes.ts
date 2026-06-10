@@ -17,6 +17,7 @@ import {
   insertLessonSchema,
   generateLessonRequestSchema,
 } from "@shared/schema";
+import { requireAuth, requireAdmin } from "../../core/auth-middleware";
 import {
   getPublishedLessons,
   getAllLessons,
@@ -29,7 +30,7 @@ import { generateLesson } from "./generator";
 
 export function registerLessonsRoutes(app: Express): void {
   // List published lessons (students)
-  app.get("/api/lessons", async (_req, res) => {
+  app.get("/api/lessons", requireAuth, async (_req, res) => {
     try {
       const lessons = await getPublishedLessons();
       res.json(lessons);
@@ -40,7 +41,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
   // List all lessons (admin, includes unpublished)
-  app.get("/api/admin/lessons", async (_req, res) => {
+  app.get("/api/admin/lessons", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const lessons = await getAllLessons();
       res.json(lessons);
@@ -51,7 +52,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
   // Get single lesson by lessonId (string)
-  app.get("/api/lessons/:lessonId", async (req, res) => {
+  app.get("/api/lessons/:lessonId", requireAuth, async (req, res) => {
     try {
       const lesson = await getLessonByLessonId(req.params.lessonId);
       if (!lesson) {
@@ -65,7 +66,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
   // Create new lesson
-  app.post("/api/lessons", async (req, res) => {
+  app.post("/api/lessons", requireAuth, requireAdmin, async (req, res) => {
     try {
       const parsed = insertLessonSchema.safeParse(req.body);
 
@@ -85,7 +86,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
   // Update lesson (numeric id)
-  app.put("/api/lessons/:id", async (req, res) => {
+  app.put("/api/lessons/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -114,7 +115,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
   // Delete lesson (numeric id)
-  app.delete("/api/lessons/:id", async (req, res) => {
+  app.delete("/api/lessons/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
@@ -134,7 +135,7 @@ export function registerLessonsRoutes(app: Express): void {
   });
 
   // Generate lesson content automatically using AI
-  app.post("/api/lessons/generate", async (req, res) => {
+  app.post("/api/lessons/generate", requireAuth, requireAdmin, async (req, res) => {
     try {
       const parsed = generateLessonRequestSchema.safeParse(req.body);
 

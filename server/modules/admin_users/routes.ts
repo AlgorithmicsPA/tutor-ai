@@ -11,6 +11,7 @@
  */
 import type { Express } from "express";
 import { type InsertUser } from "@shared/schema";
+import { requireAuth, requireAdmin } from "../../core/auth-middleware";
 import {
   getAllUsers,
   getUserByUsername,
@@ -23,7 +24,7 @@ import {
 
 export function registerAdminUsersRoutes(app: Express): void {
   // Get all users (admin only)
-  app.get("/api/admin/users", async (_req, res) => {
+  app.get("/api/admin/users", requireAuth, requireAdmin, async (_req, res) => {
     try {
       const allUsers = await getAllUsers();
       const sanitizedUsers = allUsers.map(sanitizeUser);
@@ -35,7 +36,7 @@ export function registerAdminUsersRoutes(app: Express): void {
   });
 
   // Create new user (admin only)
-  app.post("/api/admin/users", async (req, res) => {
+  app.post("/api/admin/users", requireAuth, requireAdmin, async (req, res) => {
     try {
       const { username, password, name, role } = req.body;
 
@@ -67,7 +68,7 @@ export function registerAdminUsersRoutes(app: Express): void {
   });
 
   // Update user (admin only)
-  app.put("/api/admin/users/:id", async (req, res) => {
+  app.put("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const { name, role, password } = req.body;
@@ -94,7 +95,7 @@ export function registerAdminUsersRoutes(app: Express): void {
   });
 
   // Delete user (admin only)
-  app.delete("/api/admin/users/:id", async (req, res) => {
+  app.delete("/api/admin/users/:id", requireAuth, requireAdmin, async (req, res) => {
     try {
       const userId = parseInt(req.params.id);
       const deleted = await deleteUser(userId);

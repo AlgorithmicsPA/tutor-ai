@@ -41,7 +41,7 @@ async function generateWithClaudeCLI(prompt: string, timeoutMs = 120000): Promis
   return new Promise((resolve, reject) => {
     const proc = spawn(
       CLAUDE_CLI,
-      ["-p", prompt, "--output-format", "json", "--model", "claude-opus-4-7[1m]"],
+      ["-p", prompt, "--output-format", "json", "--model", "claude-opus-5[1m]"],
       {
         env: { ...process.env, ANTHROPIC_API_KEY: "" },
         stdio: ["ignore", "pipe", "pipe"],

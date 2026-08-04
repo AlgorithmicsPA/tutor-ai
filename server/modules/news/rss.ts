@@ -62,7 +62,7 @@ async function fetchFeed(name: string, url: string, timeoutMs = 10000): Promise<
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; TutorAINewsBot/1.0; +https://tutorai.duckdns.org)",
+        "User-Agent": "Mozilla/5.0 (compatible; TutorAINewsBot/1.0; +https://tutorai.gruposer.com.ar)",
         "Accept": "application/rss+xml, application/xml, text/xml, */*",
       },
     });

@@ -40,6 +40,15 @@ export function ChatSimulatorWidget({
     },
     onSuccess: (reply) => {
       setMessages(prev => [...prev, { role: "assistant", content: reply }]);
+    },
+    // Desde que /api/tutor devuelve 503 cuando ningún LLM contesta (en vez de 200 con texto
+    // enlatado), este widget se quedaba mudo: react-query se comía el error y el alumno veía
+    // su mensaje sin respuesta. Mejor decirle que falló que dejarlo esperando.
+    onError: () => {
+      setMessages(prev => [...prev, {
+        role: "assistant",
+        content: "No pude responder en este momento. Probá de nuevo en un rato.",
+      }]);
     }
   });
 

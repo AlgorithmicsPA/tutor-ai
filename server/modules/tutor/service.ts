@@ -44,8 +44,8 @@ export async function runTutorChat(input: RunTutorChatInput): Promise<RunTutorCh
       response.choices[0]?.message?.content || "Lo siento, no pude generar una respuesta.";
     return { reply, usedProvider: "openai" };
   } catch (openaiError: any) {
-    console.log(
-      "OpenAI error, attempting Gemini fallback:",
+    console.error(
+      "[tutor] proveedor primario fallo, intento Gemini:",
       openaiError.code || openaiError.message,
     );
 
@@ -77,7 +77,7 @@ export async function runTutorChat(input: RunTutorChatInput): Promise<RunTutorCh
         console.log("Successfully used Gemini fallback");
         return { reply, usedProvider: "gemini" };
       } catch (geminiError: any) {
-        console.error("Gemini fallback also failed:", geminiError);
+        console.error("[tutor] el fallback Gemini tambien fallo:", geminiError);
         const isContentFilter =
           openaiError.code === "content_filter" ||
           openaiError.message?.includes("content") ||
@@ -96,7 +96,7 @@ export async function runTutorChat(input: RunTutorChatInput): Promise<RunTutorCh
     const reply = isContentFilter
       ? "Entendido. ¿Puedes contarme más sobre el público objetivo?"
       : "¡Perfecto! ¿Qué más información puedes compartir?";
-    console.log("Using fallback message, no Gemini API key available");
+    console.error("[tutor] sin GEMINI_API_KEY, se usa el texto enlatado");
     return { reply, usedProvider: "fallback" };
   }
 }

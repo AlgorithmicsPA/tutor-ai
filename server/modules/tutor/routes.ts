@@ -32,13 +32,27 @@ export function registerTutorRoutes(app: Express): void {
 
       const { messages, system } = parsed.data;
 
-      const { reply } = await runTutorChat({ messages, system });
+      const { reply, usedProvider } = await runTutorChat({ messages, system });
+
+      // El tutor NO puede fallar en HTTP 200. Cuando ningún proveedor contestó,
+      // `runTutorChat` devuelve un texto enlatado que se lee igual que una respuesta real:
+      // ese era el motivo de que el chat se rompiera en silencio durante días (nginx veía
+      // 200, el guardian veía el proceso online, nadie miraba el cuerpo). El texto se sigue
+      // mandando para que el frontend tenga algo que mostrar, pero el status dice la verdad
+      // y el log queda grepeable.
+      if (usedProvider === "fallback") {
+        console.error(
+          "[tutor] LLM_UNAVAILABLE: ningun proveedor contesto, se responde 503 en vez de texto enlatado",
+        );
+        return res.status(503).json({ error: "llm_unavailable", reply });
+      }
+
       const responseData: TutorResponse = { reply };
       res.json(responseData);
     } catch (error: any) {
-      console.error("Tutor API unexpected error:", error);
-      // Last resort - return a valid response instead of 500
-      res.json({
+      console.error("[tutor] LLM_UNAVAILABLE (error inesperado):", error);
+      res.status(503).json({
+        error: "llm_unavailable",
         reply: "Lo siento, tuve un problema técnico. ¿Podrías repetir tu última respuesta?",
       });
     }

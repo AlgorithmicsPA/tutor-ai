@@ -11,10 +11,15 @@ const LLM_GATEWAY_LOCAL = "http://127.0.0.1:8318/v1";
 function getOpenAI(): OpenAI | null {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey === "dummy-no-op-placeholder") return null;
+  // Sin el `|| LLM_GATEWAY_LOCAL` que sí tiene modules/tutor/openai-client.ts, un env vacío
+  // deja baseURL undefined y el SDK sale al endpoint pago de OpenAI — el default silencioso
+  // que ya rompió tutorai el 04/08 y el motivo del bloque C del guard.
+  // Dos razones para que este comentario viva ACÁ y no adentro del constructor:
+  //  · el host no se escribe literal (esbuild conserva los comentarios en dist/, y el guard
+  //    audita el bundle deployado: narrar la regla contaría como violarla);
+  //  · el guard lee una ventana acotada desde `new OpenAI(` — seis líneas de comentario
+  //    adentro empujan el `baseURL` fuera de esa ventana y el archivo sale como violación.
   return new OpenAI({
-    // Sin el `|| LLM_GATEWAY_LOCAL` que sí tiene modules/tutor/openai-client.ts, un env
-    // vacío deja baseURL undefined y el SDK sale a api.openai.com — el default silencioso
-    // que ya rompió tutorai el 04/08 y el motivo por el que existe el bloque C del guard.
     baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || LLM_GATEWAY_LOCAL,
     apiKey,
   });

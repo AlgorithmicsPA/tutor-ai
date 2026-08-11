@@ -6,12 +6,16 @@ import type { WeeklyNews, NewsClassContent } from "@shared/schema";
 import { TOPIC_LABELS } from "@shared/schema";
 
 const CLAUDE_CLI = "/usr/local/bin/claude";
+const LLM_GATEWAY_LOCAL = "http://127.0.0.1:8318/v1";
 
 function getOpenAI(): OpenAI | null {
   const apiKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey || apiKey === "dummy-no-op-placeholder") return null;
   return new OpenAI({
-    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
+    // Sin el `|| LLM_GATEWAY_LOCAL` que sí tiene modules/tutor/openai-client.ts, un env
+    // vacío deja baseURL undefined y el SDK sale a api.openai.com — el default silencioso
+    // que ya rompió tutorai el 04/08 y el motivo por el que existe el bloque C del guard.
+    baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL || LLM_GATEWAY_LOCAL,
     apiKey,
   });
 }
